@@ -1,0 +1,32 @@
+# 1. Create working directory
+New-Item -ItemType Directory -Path C:\temp -Force
+Set-Location -Path C:\temp
+
+# 2. Download and install Python (silent)
+Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.11.5/python-3.11.5-amd64.exe" -OutFile "python-installer.exe"
+Start-Process -Wait -FilePath ".\python-installer.exe" -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1"
+Remove-Item "python-installer.exe" -Force
+
+# 3. Refresh current session PATH so python/pip work
+$env:Path += ";C:\Program Files\Python311\;C:\Program Files\Python311\Scripts\"
+
+# 4. Persist PATH system-wide for future sessions
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\Python311\;C:\Program Files\Python311\Scripts\", "Machine")
+
+# 5. Install AWS CLI
+Invoke-WebRequest -Uri "https://awscli.amazonaws.com/AWSCLIV2.msi" -OutFile "AWSCLIV2.msi"
+Start-Process -Wait msiexec.exe -ArgumentList "/i AWSCLIV2.msi /qn"
+Remove-Item "AWSCLIV2.msi" -Force
+$env:Path += ";C:\Program Files\Amazon\AWSCLIV2\"
+
+# 6. Install required Python packages
+& "C:\Program Files\Python311\python.exe" -m pip install `
+  boto3 pdfplumber python-docx PyPDF2 openpyxl `
+  lxml beautifulsoup4 sentence-transformers tqdm `
+  langchain pinecone pywin32 spire-doc
+
+# 7. Copy the pipeline script from S3
+aws s3 cp s3://verztec-policy-data/pipeline.py C:\temp\
+
+# 8. Run
+& "C:\\Program Files\\Python311\\python.exe" C:\\temp\\pipeline.py
