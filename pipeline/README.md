@@ -13,8 +13,6 @@ This script is run by the server once the file watcher detects any changes in th
 - [Extraction Capabilities](#extraction-capabilities)
 - [Why We Use Chunks](#why-we-use-chunks)
 - [Sample of Chunking Overlap](#sample-of-chunking-overlap-using-recursivecharactertextsplitter)
-- [Deployment Note](#deployment-note)
-- [Core Assumptions](#core-assumptions)
 - [Known Limitations](#known-limitations)
 
 ---
