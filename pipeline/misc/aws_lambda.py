@@ -5,8 +5,8 @@ ec2 = boto3.client('ec2')
 ssm = boto3.client('ssm')
 sns = boto3.client('sns')
 
-INSTANCE_ID = 'i-02675c774f4e79477'
-SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:571600844113:CompanyPolicyUpdate'
+INSTANCE_ID = 'i-02675c774f4e79477' # CHANGE WITH YOUR INSTANCE ID
+SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:571600844113:CompanyPolicyUpdate' # CHANGE WITH YOUR SNS TOPIC ARN
 
 def wait_for_ssm_ready(instance_id, timeout=300):
     print("Waiting for SSM agent to become ready...")

@@ -1,121 +1,134 @@
+"""
+This script is designed to extract text from various document formats (.pdf, .docx, .doc),
+chunk the text into smaller sections, and embed these sections, and save them to a vector store.
+
+This is part of a larger pipeline for document processing and embedding, and is run upon the upload of new documents.
+
+Supported file formats:
+- PDF
+- DOCX, DOC
+- XLSX, XLS
+- PPTX, PPT
+- CSV
+- TXT
+- HTML
+- Markdown
+
+MIT License
+Copyright (c) 2025 Tey Xue Cong, Tan Hong Kai, Siah Wan Ru Tricia, Tee Jia Yee
+See the LICENSE file in the project root for full license information.
+"""
+
 import io
-import sys
 import os
 import json
 import unicodedata
-import subprocess
-import boto3
-import shutil
+import xlrd
+from openpyxl import load_workbook
+from pptx import Presentation
 from docx import Document
-from spire.doc import Document as SpireDocument
-from spire.doc import FileFormat
-import win32com.client
-from sentence_transformers import SentenceTransformer
+import json
 import pdfplumber
 from lxml import etree
-from pinecone import Pinecone
-from tqdm import tqdm
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+import pandas as pd
+import faiss
+import sys
+import win32com.client
+from operator import itemgetter
+from llama_index.core.schema import Document as llamadoc
+from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage
+from llama_index.vector_stores.faiss import FaissVectorStore
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.core import Settings
+from llama_index.llms.ollama import Ollama
+from llama_index.core.node_parser import SimpleNodeParser
+from llama_index.core.storage.docstore import SimpleDocumentStore
+from llama_index.core.storage.index_store import SimpleIndexStore
+from llama_index.core.storage.kvstore.simple_kvstore import SimpleKVStore
 
+BASE_DIR = r'C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\Beep_Boop\pipeline\src'
+RAW_DATA = r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\Beep_Boop\pipeline\data\raw_data"
+LOG_FILE = os.path.join(BASE_DIR, '..', 'data', 'Logs', 'processed_files.json')
 
-PINECONE_API_KEY = "pcsk_4Zrgdk_JE48SUN5TDzkNnqYWdbszMCwwkJpQpQLq5MxQDw4a7vJGyiWEMeEJMWhv9CWADB"
-PINECONE_ENV = "us-east-1"
-INDEX_NAME = "internal-docs"
-pc = Pinecone(api_key=PINECONE_API_KEY, environment=PINECONE_ENV)
-index = pc.Index(INDEX_NAME)
+# This one is for embeding USER query
+Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2") # MUST BE SAME AS THE ONE USED FOR INDEXING
+embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
+
+# The embedding model is chosen based on the Hugging Face MTEB leaderboard:
+# https://huggingface.co/spaces/mteb/leaderboard?benchmark_name=MTEB(Multilingual,+v2)
+
+# This model is a subset of the multilingual model "multilingual-e5-large-instruct", which was 4th on the leaderboard.
+# We selected "intfloat/e5-large-v2" as it offers the best performance-to-efficiency ratio
+# It is faster and more lightweight than the multilingual version, making it suitable for our real-time use case.
+
+# Set Ollama as the default LLM globally
+Settings.llm = Ollama(model="llama3.2", context_window=4096, timeout=120)
+persist_dir = "../data/Embedded"
+faiss_path = "faiss.index"
+faiss_file_path = os.path.join(persist_dir, faiss_path)
+
+file = r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\sample docs for PM dept\Follow Ups_Importance.pdf"
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-model = SentenceTransformer("BAAI/bge-large-en")
-
-# Hardcoded for windows AMI image
-RAW_DATA = "C:\\temp\\raw_data"
-LOG_FILE = "C:\\temp\\Logs\\processed_files.json"
-S3_LOG_BUCKET = 'verztec-logs'
-S3_LOG_KEY = "logs/processed_files.json"
-os.makedirs(RAW_DATA, exist_ok=True)
-os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-
-# 0. Load data from S3
-S3_BUCKET = 'verztec-policy-data'
-
-def clear_raw_data_folder():
-    """ Clears the raw data folder, ensures clean download and processing """
-    if os.path.exists(RAW_DATA):
-        shutil.rmtree(RAW_DATA)
-    os.makedirs(RAW_DATA)
-
-def download_files_from_s3():
-    """ Downloads all files from S3 data bucket, provided they are supported formats """
-    s3 = boto3.client('s3')
-    os.makedirs(RAW_DATA, exist_ok=True)
-
-    response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix="RAW_DATA/")
-    for obj in response.get('Contents', []):
-        key = obj['Key']
-        if not key.lower().endswith(('.pdf', '.docx', '.doc')):
-            continue  # Skip unsupported files
-
-        filename = os.path.basename(key)
-        local_path = os.path.join(RAW_DATA, filename)
-        print(f"Downloading {key} -> {local_path}")
-        s3.download_file(S3_BUCKET, key, local_path)
-
-def download_log_from_s3():
-    """ Download log file from S3 bucket """
-    s3 = boto3.client('s3')
-    try:
-        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-        s3.download_file(S3_LOG_BUCKET, S3_LOG_KEY, LOG_FILE)
-        print("Downloaded existing log from S3.")
-    except s3.exceptions.ClientError as e:
-        print("No existing log file found in S3. Starting fresh.")
-        with open(LOG_FILE, "w") as f:
-            json.dump([], f)
-
-def convert_doc_to_docx():
-    """ 
-    Processing of .doc files requires Word Application, which requires a license.
-    So we will convert .doc files into .docx files for processing.
-    """
-    for filename in os.listdir(RAW_DATA):
-        if filename.lower().endswith('.doc') and not filename.lower().endswith('.docx'):
-            input_path = os.path.join(RAW_DATA, filename)
-            output_path = os.path.splitext(input_path)[0] + ".docx"
-            print(f"Converting {filename} to .docx...")
-
-            try:
-                doc = SpireDocument()
-                doc.LoadFromFile(input_path)
-                doc.SaveToFile(output_path, FileFormat.Docx2016)
-                doc.Close()
-                print(f"Converted {filename} to .docx successfully.")
-                os.remove(input_path)
-
-            except Exception as e:
-                print(f"Failed to convert {filename} with Spire.Doc: {e}")
 
 
 
 # 1. Extraction
 
 def extract_text_from_pdf(file_path):
-    """Extracts PDF, ignores images"""
+    """Extracts .pdf files"""
     output = []
 
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
-            # Extract plain text
-            plain_text = page.extract_text()
-            if plain_text:
-                output.append(plain_text.strip())
+            blocks = []
 
-            # Extract tables
-            tables = page.extract_tables()
+            # Extract all tables with bbox
+            tables = page.find_tables()
             for table in tables:
-                formatted_table = []
-                for row in table:
+                table_bbox = table.bbox
+                table_content = []
+                for row in table.extract():
                     row_text = " | ".join(cell.strip() if cell else "" for cell in row)
-                    formatted_table.append(f"| {row_text} |")
-                output.append("\n".join(formatted_table))
+                    table_content.append(f"| {row_text} |")
+                blocks.append({
+                    'type': 'table',
+                    'top': table_bbox[1],
+                    'bottom': table_bbox[3],
+                    'content': "\n".join(table_content)
+                })
+
+            # Extract all words
+            words = page.extract_words()
+            # Group words into lines by their vertical position (rounded)
+            lines_map = {}
+            for word in words:
+                top = round(word['top'], 1)
+                if top not in lines_map:
+                    lines_map[top] = []
+                lines_map[top].append(word)
+
+            # Convert lines_map to list of text blocks
+            for top, word_group in lines_map.items():
+                line_text = " ".join(w['text'] for w in sorted(word_group, key=lambda w: w['x0']))
+                # Check if line overlaps any table
+                in_table = False
+                for t in blocks:
+                    if t['type'] == 'table' and t['top'] <= top <= t['bottom']:
+                        in_table = True
+                        break
+                if not in_table:
+                    blocks.append({
+                        'type': 'text',
+                        'top': top,
+                        'content': line_text
+                    })
+
+            # Sort blocks by Y position
+            blocks_sorted = sorted(blocks, key=itemgetter('top'))
+
+            page_output = [block['content'] for block in blocks_sorted]
+            output.append("\n".join(page_output))
 
     return "\n\n".join(output)
 
@@ -168,7 +181,7 @@ def extract_text_from_doc(file_path):
 
                     # Some markers are invisible or from Wingdings/Symbol font (like '\uf0b7')
                     # These don't render well, so we substitute a standard bullet
-                    if not marker.isprintable() or ord(marker[0]) >= 0xF000:
+                    if not marker or not marker.isprintable() or ord(marker[0]) >= 0xF000:
                         marker = '•'
                     para_text = f"{indent}{marker} {para_text}"
 
@@ -184,9 +197,22 @@ def extract_text_from_doc(file_path):
         else:
             start = current_range.End  # Fallback to avoid infinite loop
 
+     # Extract text from shapes
+    for shape in doc.Shapes:
+        if shape.TextFrame.HasText:
+            shape_text = shape.TextFrame.TextRange.Text.strip().replace('\r', '').replace('\x07', '')
+            if shape_text:
+                full_text.append("[Shape Text] " + shape_text)
+
+    for ishape in doc.InlineShapes:
+        if hasattr(ishape, "TextFrame") and ishape.TextFrame.HasText:
+            shape_text = ishape.TextFrame.TextRange.Text.strip().replace('\r', '').replace('\x07', '')
+            if shape_text:
+                full_text.append("[Inline Shape Text] " + shape_text)
+                
     doc.Close(False)
     word.Quit()
-    return '\n\n'.join(full_text)
+    return '\n'.join(full_text)
 
 
 def extract_text_from_docx(file_path):
@@ -247,97 +273,371 @@ def extract_text_from_docx(file_path):
 
     return '\n'.join(full_text)
 
+
+def extract_text_from_xls(file_path):
+    """Extracts .xls file, ignoring formulas"""
+    book = xlrd.open_workbook(file_path)
+    all_text = ""
+
+    for sheet in book.sheets():
+        all_text += f"--- Sheet: {sheet.name} ---\n"
+        for row_idx in range(sheet.nrows):
+            row_values = sheet.row_values(row_idx)
+            line_parts = []
+            for val in row_values:
+                if isinstance(val, float):
+                    line_parts.append(f"{val:.7g}")  # Prevent floating points stuff from going crazy
+                else:
+                    line_parts.append(str(val).strip())
+            all_text += "\t".join(line_parts) + "\n"
+        all_text += "\n"
+    
+    return all_text
+
+
+def extract_text_from_xlsx(file_path):
+    """Extracts .xlsx files, ignoring formulas"""
+    wb = load_workbook(filename=file_path, data_only=True) # Don't extract formulas
+    all_text = ""
+
+    for sheet in wb.sheetnames:
+        ws = wb[sheet]
+        all_text += f"--- Sheet: {sheet} ---\n"
+        for row in ws.iter_rows():
+            row_values = []
+            for cell in row:
+                value = str(cell.value) if cell.value is not None else ""
+                row_values.append(value)
+            all_text += "\t".join(row_values).rstrip() + "\n"
+        all_text += "\n"
+    
+    return all_text
+
+
+def extract_text_from_csv(file_path):
+    """Extracts .csv files"""
+    df = pd.read_csv(file_path)
+    return df.to_string(index=False)
+
+
+def extract_text_from_txt(file_path):
+    """Extracts .txt files"""
+    with open(file_path, "r", encoding="utf-8") as file:
+        return file.read()
+    
+
+def extract_text_from_html(file_path):
+    """Extract .html files"""
+    with open(file_path, 'r', encoding='utf-8') as file:
+        soup = BeautifulSoup(file, 'html.parser')
+
+    def format_element(element):
+        """
+        Apply custom formatting to certain HTML elements:
+        - <li>: Format as list item with a dash
+        - <table>: Format as a tab-separated grid
+        - <a>: Replace with "text (href)" format
+        """
+        if element.name == 'li':
+            return f"- {element.get_text(' ', strip=True)}\n"
+
+        elif element.name == 'table':
+            table_text = []
+            for row in element.find_all('tr'):
+                row_text = []
+                for cell in row.find_all(['td', 'th']):
+                    # Handles cells in tables
+                    cell_text = cell.get_text(" ", strip=True).replace('\r', '').replace('\x07', '')
+                    row_text.append(cell_text)
+                table_text.append(' | '.join(row_text))
+            return '\n'.join(table_text) + '\n'
+        
+        elif element.name == 'a' and element.has_attr('href'):
+            return f"{element.get_text(strip=True)} ({element['href']})"
+        else:
+            return None
+
+    def traverse(node):
+        """Traverse the HTML tree and extract formatted text."""
+        output = ''
+
+        for child in node.children:
+            if isinstance(child, NavigableString):
+                output += child
+            elif isinstance(child, Tag):
+                if child.name in ['script', 'style']:
+                    continue
+                # Deal with hyperlinks
+                if child.name == 'a' and child.has_attr('href'):
+                    output += format_element(child)
+                elif child.name in ['li', 'table']:
+                    output += format_element(child)
+                else:
+                    output += traverse(child)
+        return output
+
+    body = soup.body or soup  # Fallback if the text is not associated with a <body> thing
+    formatted_text = traverse(body)
+    return "\n".join(line.strip() for line in formatted_text.splitlines() if line.strip())
+
+
+def extract_text_from_ppt(ppt_path):
+    """Extract text and speaker notes from .ppt"""
+    powerpoint = win32com.client.Dispatch("PowerPoint.Application")
+    powerpoint.Visible = 1
+
+    presentation = powerpoint.Presentations.Open(ppt_path, WithWindow=False)
+    all_text = []
+
+    for i, slide in enumerate(presentation.Slides, start=1):
+        slide_text = [f"--- Slide {i} ---"]
+
+        for shape in slide.Shapes:
+            # Handle text and bullet lists
+            if shape.HasTextFrame:
+                tf = shape.TextFrame
+                if tf.HasText:
+                    paragraphs = []
+                    for paragraph in tf.TextRange.Paragraphs():
+                        text = paragraph.Text.strip().replace('\r', '')
+                        if text:
+                            bullet = "- " if paragraph.ParagraphFormat.Bullet.Type != 0 else ""
+                            paragraphs.append(bullet + text)
+                    if paragraphs:
+                        slide_text.append("\n".join(paragraphs))
+
+            # Handle tables
+            if shape.HasTable:
+                table = shape.Table
+                table_text = []
+                for row in range(1, table.Rows.Count + 1):
+                    row_text = []
+                    for col in range(1, table.Columns.Count + 1):
+                        cell = table.Cell(row, col)
+                        cell_text = cell.Shape.TextFrame.TextRange.Text.strip().replace('\r', '').replace('\x07', '')
+                        row_text.append(cell_text)
+                    table_text.append(" | ".join(row_text))
+                slide_text.append("\n".join(table_text))
+
+        # Speaker Notes
+        if slide.NotesPage.Shapes.Placeholders.Count >= 2:
+            notes_shape = slide.NotesPage.Shapes.Placeholders(2)
+            if notes_shape.HasTextFrame and notes_shape.TextFrame.HasText:
+                notes = notes_shape.TextFrame.TextRange.Text.strip().replace('\r', '')
+                if notes:
+                    slide_text.append(f"[Notes] {notes}")
+
+        all_text.append("\n".join(slide_text))
+
+    presentation.Close()
+    powerpoint.Quit()
+
+    return "\n\n".join(all_text)
+
+
+def is_bullet_paragraph(paragraph):
+    """
+    Check if a paragraph has bullet formatting by inspecting XML.
+    We have to do this since python-pptx cannot detect bullets natively :(
+    """
+    pPr = paragraph._element.pPr
+    return pPr is not None and pPr.find(".//a:buChar", namespaces={'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}) is not None
+
+def extract_text_from_pptx(file_path):
+    """Extract text and notes from a .pptx file."""
+    presentation = Presentation(file_path)
+    all_text = []
+
+    for i, slide in enumerate(presentation.slides, start=1):
+        slide_text = [f"--- Slide {i} ---"]
+
+        for shape in slide.shapes:
+            # Handle text and bullet lists
+            if shape.has_text_frame:
+                paragraphs = []
+                for para in shape.text_frame.paragraphs:
+                    text = para.text.strip()
+                    if not text:
+                        continue
+
+                    if is_bullet_paragraph(para):
+                        indent = "  " * para.level
+                        paragraphs.append(f"{indent}- {text}")
+                    else:
+                        paragraphs.append(text)
+
+                if paragraphs:
+                    slide_text.append("\n".join(paragraphs))
+
+            # Handle Tables
+            if shape.shape_type == 19:  # MSO_SHAPE_TYPE.TABLE
+                table = shape.table
+                table_text = []
+                for row in table.rows:
+                    row_text = []
+                    for cell in row.cells:
+                        cell_text = cell.text.strip().replace('\r', '').replace('\x07', '')
+                        row_text.append(cell_text)
+                    table_text.append(' | '.join(row_text))
+                slide_text.append('\n'.join(table_text))
+
+        # Speaker Notes
+        notes_slide = slide.notes_slide if slide.has_notes_slide else None
+        if notes_slide:
+            notes_text = notes_slide.notes_text_frame.text.strip()
+            if notes_text:
+                slide_text.append(f"[Notes] {notes_text}")
+
+        all_text.append("\n".join(slide_text))
+
+    return "\n\n".join(all_text)
+
+def extract_text_from_md(file_path):
+    """Extract .md file"""
+    with open(file_path, 'r', encoding='utf-8') as file:
+        return file.read()
+
+
 # 2. Chunking
 
-def split_and_print_chunks(text, chunk_size=1000, chunk_overlap=200):
+def split_into_documents(text, chunk_size=1000, chunk_overlap=200, title="Untitled", source="unknown.txt", iso=False):
     """
-    Splits the input text into chunks and prints each chunk with its index.
+    Splits text into chunks and returns them as LlamaIndex Document objects with metadata.
 
     Parameters:
-        text (str): The text to be split.
-        chunk_size (int): The maximum size of each chunk.
-        chunk_overlap (int): The number of overlapping characters between chunks.
+        text (str): The full input text to split.
+        chunk_size (int): Max characters per chunk.
+        chunk_overlap (int): Characters to overlap between chunks.
+        title (str): Title of the source document.
+        source (str): Filename of the source document.
+        iso (bool): Whether the document is about ISO files.
+
+    Returns:
+        List[Document]: Chunked Document objects with metadata.
     """
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200
+    splitter = RecursiveCharacterTextSplitter( # Used RecussiveCharacterTextSplitter because it's good at identifying paragraphs and natural sections
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap
     )
 
     chunks = splitter.split_text(text)
-
-
     print(f"Total chunks: {len(chunks)}\n")
 
+    documents = []
     for i, chunk in enumerate(chunks):
-        print(f"\n--- Chunk {i + 1} ---\n{chunk}\n{'-' * 60}")
+        metadata = {
+            "chunk": i,
+            "title": title,
+            "source": source,
+            "iso": iso
+        }
+        doc = llamadoc(text=chunk, metadata=metadata)
+        documents.append(doc)
 
-    return chunks
+    return documents
 
-# 3. Embedding
 
-def embedding_chunks(file_path, chunks, model):
+# 3. Embedding + Saving
+
+def build_or_append_index(documents, embed_model, persist_dir="../data/Embedded", faiss_path="faiss.index", embedding_dim=1024):
     """
-    Encodes text chunks into embeddings and structures them with metadata.
+    Create or append to a FAISS + LlamaIndex index.
 
     Parameters:
-        file_path (str): Path to the source file (used for metadata).
-        chunks (list): Chunked text data to be embedded.
-        model_name (str): Name of the sentence transformer model to use.
-
-    Returns:
-        list: A list of dictionaries containing embeddings and metadata.
+        documents (List[Document]): New documents to insert
+        embed_model (BaseEmbedding): Embedding model (e.g., HuggingFaceEmbedding)
+        persist_dir (str): Directory where LlamaIndex metadata is stored
+        faiss_path (str): Filename for FAISS index (within persist_dir)
+        embedding_dim (int): Embedding vector size
     """
-    filename = os.path.basename(file_path)
-    embeddings = model.encode(chunks)
+    faiss_file_path = os.path.join(persist_dir, faiss_path)
 
-    vector_data = [
-        {
-            "id": f"{filename}_chunk{i}",
-            "values": embeddings[i].tolist(),
-            "metadata": {
-                "source": filename,
-                "text": chunks[i],
-                "chunk": i,
-                "chunk_size": len(chunks[i])
-            }
-        }
-        for i in range(len(chunks))
-    ]
+    os.makedirs(persist_dir, exist_ok=True)
 
-    print(f"\nEmbedded {len(vector_data)} chunks.\n")
+    if os.path.exists(faiss_file_path):
+        # Load existing FAISS and LlamaIndex
+        print("Loading existing index...")
+        faiss_index = faiss.read_index(faiss_file_path)
+        vector_store = FaissVectorStore(faiss_index=faiss_index)
+        storage_context = StorageContext.from_defaults(
+            persist_dir=persist_dir,
+            vector_store=vector_store
+        )
+        index = load_index_from_storage(storage_context)
 
-    return vector_data
+        # Append the new documents
+        parser = SimpleNodeParser()
+        nodes = parser.get_nodes_from_documents(documents)
+        index.insert_nodes(nodes)
+
+        # Persist changes
+        index.storage_context.persist(persist_dir=persist_dir)
+        faiss.write_index(faiss_index, faiss_file_path)
+
+    else:
+        # Create new FAISS and LlamaIndex
+        print("Creating new index...")
+        faiss_index = faiss.IndexFlatL2(embedding_dim)
+        vector_store = FaissVectorStore(faiss_index=faiss_index)
+        storage_context = StorageContext.from_defaults(
+            vector_store=vector_store
+        )
+        
+        kvstore = SimpleKVStore()
+        docstore = SimpleDocumentStore(kvstore)
+        index_store = SimpleIndexStore(kvstore)
+
+        storage_context = StorageContext.from_defaults(
+            docstore=docstore,
+            index_store=index_store,
+            vector_store=vector_store
+        )
+        
+        index = VectorStoreIndex.from_documents(
+            documents, storage_context=storage_context, embed_model=embed_model
+        )
+
+    print("Saving new data...")
+    index.storage_context.persist(persist_dir=persist_dir)
+    faiss.write_index(faiss_index, faiss_file_path)
+
+    return index
 
 
-# 4. Upload to Pinecone
+# 4. Main Pipeline
+def extract_text_from_file(file_path):
+    """Extract text based on file extension"""
+    file_extension = file_path.lower().split('.')[-1]
+    
+    if file_extension == "docx":
+        return extract_text_from_docx(file_path)
+    elif file_extension == "doc":
+        return extract_text_from_doc(file_path)
+    elif file_extension == "pdf":
+        return extract_text_from_pdf(file_path)
+    elif file_extension == "pptx":
+        return extract_text_from_pptx(file_path)
+    elif file_extension == "ppt":
+        return extract_text_from_ppt(file_path)
+    elif file_extension == "xls":
+        return extract_text_from_xls(file_path)
+    elif file_extension == "xlsx":
+        return extract_text_from_xlsx(file_path)
+    elif file_extension == "csv":
+        return extract_text_from_csv(file_path)
+    elif file_extension == "txt":
+        return extract_text_from_txt(file_path)
+    elif file_extension == "html":
+        return extract_text_from_html(file_path)
+    elif file_extension == "md":
+        return extract_text_from_md(file_path)
+    else:
+        raise ValueError(f"Unsupported file type: {file_extension}")
 
-def upload_to_pinecone(vector_data, index_name, pinecone_api_key, pinecone_env, batch_size=100, namespace=None):
-    """ Uploads a list of vectors to a Pinecone index """
-    pc = Pinecone(api_key=pinecone_api_key, environment=pinecone_env)
-    index = pc.Index(index_name)
-
-    print(f"\nStarting upload to Pinecone index '{index_name}' (batch size: {batch_size})...")
-
-    for start in tqdm(range(0, len(vector_data), batch_size), desc="Upserting to Pinecone"):
-        batch = vector_data[start:start + batch_size]
-        index.upsert(vectors=batch, namespace=namespace)
-
-    print(f"\nUploaded {len(vector_data)} vectors to Pinecone index '{index_name}'.")
-
-# 5. Update the logging to S3
-def upload_log_to_s3():
-    """ Updates the log file into S3 logging bucket (Different to prevent recursion) """
-    s3 = boto3.client('s3')
-    try:
-        s3.upload_file(LOG_FILE, S3_LOG_BUCKET, S3_LOG_KEY)
-        print("Uploaded log file to S3.")
-    except Exception as e:
-        print(f"Failed to upload log file: {e}")
-
-# 6. Main Pipeline
 def run_pipeline(raw_folder):
-    """ Runs the pipeline to extract new files """
     new_files = []
+
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
     # Ensure log file exists and has valid JSON
     if not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0:
@@ -355,22 +655,11 @@ def run_pipeline(raw_folder):
 
         print(f"\nProcessing file: {filename}")
         file_path = os.path.join(raw_folder, filename)
-        
-        try:
-            if filename.endswith(".pdf"):
-                extracted_text = extract_text_from_pdf(file_path)
-            elif filename.endswith(".docx"):
-                extracted_text = extract_text_from_docx(file_path)
-            # elif filename.endswith(".doc"):
-            #    extracted_text = extract_text_from_doc(file_path)
-            else:
-                continue  # skip unknown file types
-            chunks = split_and_print_chunks(extracted_text, chunk_size=1000, chunk_overlap=200)
-            vector_data = embedding_chunks(file_path, chunks, model)
-            upload_to_pinecone(vector_data, INDEX_NAME, PINECONE_API_KEY, PINECONE_ENV, batch_size = 1, namespace = None)
-            new_files.append(filename)
-        except Exception as e:
-            print(f'Failed to process: {filename}: {e}')
+        extracted_text = extract_text_from_file(file_path)
+
+        documents = split_into_documents(extracted_text, title=filename, source=filename)
+        build_or_append_index(documents, embed_model, persist_dir="../data/Embedded", faiss_path="faiss.index", embedding_dim=1024)
+        new_files.append(filename)
 
     # Update log file
     processed_files.update(new_files)
@@ -380,9 +669,4 @@ def run_pipeline(raw_folder):
     print("Pipeline completed. Database has been updated!")
 
 if __name__ == "__main__":
-    download_log_from_s3()
-    clear_raw_data_folder()
-    download_files_from_s3()
-    convert_doc_to_docx()
     run_pipeline(RAW_DATA)
-    upload_log_to_s3()

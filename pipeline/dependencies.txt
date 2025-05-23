@@ -1,0 +1,10 @@
+pip install xlrd
+pip install python-docx
+pip install spire.doc
+pip install pywin32
+pip install sentence-transformers
+pip install pdfplumber
+pip install lxml
+pip install tqdm
+pip install langchain
+pip install pandas
