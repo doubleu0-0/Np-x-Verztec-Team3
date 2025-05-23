@@ -1,47 +1,34 @@
 # Document Processing and Embedding Pipeline
 
-The source code has 2 python files: 1 pipeline.py file, and a code for the lambda function
+The folder contains the source code to run the pipeline itself, but also an alternative that can be ran on aws, should the company decide to migrate it's database.
 
 This Python script processes raw documents containing the policies of the company, extracts the text, splits the content into chunks, generates embeddings, and uploads them into a vector database.
 
-This script is run by an EC2 instance triggered by a lambda function whenever an object is uploaded to the S3 bucket containing all the company data.
-
-The trigger for the lambda function is the uploading of the __trigger__.ready file into S3 (Make sure to upload it first, so it gets processed last).
-
+This script is run by the server once the file watcher detects any changes in the raw_data folder
 ---
 
 ## Table of Contents
 
 - [Pipeline Overview](#pipeline-overview)
-- [AWS Architecture](#aws-architecture)
 - [Extraction Capabilities](#extraction-capabilities)
 - [Why We Use Chunks](#why-we-use-chunks)
 - [Sample of Chunking Overlap](#sample-of-chunking-overlap-using-recursivecharactertextsplitter)
 - [Deployment Note](#deployment-note)
 - [Core Assumptions](#core-assumptions)
 - [Known Limitations](#known-limitations)
-- [AWS Setup](#aws-setup)
 
 ---
 
 ## Pipeline Overview
 
-1. Downloads log file from S3
-2. Cleans the raw_data folder for clean extraction
-3. Downloads raw data from S3
-4. Extract the document text (PDF, DOCX, DOC)  
-5. Chunk the text using overlap-aware splitting  
-6. Embed the text chunks into dense vectors  
-7. Upload the vectors to the Pinecone database  
-8. Updates the log file in S3
+1. File watcher waits for any changes in the raw_data folder
+2. Changes trigger to code to run the pipeline
+3. Extract the document text
+4. Chunk the text using overlap-aware splitting  
+5. Embed the text chunks into dense vectors  
+6. Upload the vectors to the FAISS index  
+7. Updates the log file
 
----
-
-## AWS Architecture
-
-- **Trigger**: Uploading a special file named `__trigger__.ready` to the RAW_DATA folder in the main S3 bucket starts the pipeline.
-- **Execution**: An EC2 instance is launched by the Lambda trigger to run the processing script.
-- **Isolation**: Log files are uploaded to a separate S3 logging bucket for better monitoring and security.
 ---
 
 ## Extraction Capabilities
@@ -108,42 +95,12 @@ The overlapping section ensures continuity between chunks, especially useful for
 
 ---
 
-## Deployment Note
-
-**Since this is run separately, there is no dependency issues – hooray!**
-If you want more accuracy, change the model to one that has more dimensions for better accuracy.
-Since this pipeline is triggered when a new object is uploaded, we don't have to worry about the number of documents being too much to handle.
----
-
-## Core Assumptions
-
-1. Tables in PDFs are minimal and basic, especially for sensitive content (e.g., employee data).
-
----
-
 ## Known Limitations
 
 - Tables are not handled very well in PDFs — this is a common limitation of all open-source tools. However, basic tables can be extracted.
 - Images are unsupported.
-- .doc files have to be converted to .docx before processing due to the EC2 instance not having a word document installed
-- When converting the .doc to .docx, we are using Spire.Doc, where the free version will have this watermark: Evaluation Warning: The document was created with Spire.Doc for Python.
-
 ---
 
-## AWS Setup
-
-Here are the steps to replicate the AWS infrastructure:
-
-1) Create an EC2 instance, must use windows AMI (We used t3.large, but can scale up/down based on needs -- cost is really low since we are running it only for the duration of the pipeline.py file)
-2) Create SNS topic and subscribe to it
-3) Create S3 bucket to store python file, folder to store raw data
-4) Create another bucket to store logs
-5) Create lambda function
-6) Create and attach IAM roles for lambda and EC2 (Ensure they have the appropriate EC2, SNS, SSM access)
-7) Create an event notifcation for S3 for all new files in RAW_DATA/, with suffix of .ready, then attach it to lambda function
-8) Paste the aws_lambda.py code into lambda
-9) Connect to the EC2 instance, and copy paste the aws_requirements.txt file (step by step) into the AMI to set it up if you have not done so before
-10) Turn off the auto recovery function for EC2 instance
 
 
 Xue Cong
