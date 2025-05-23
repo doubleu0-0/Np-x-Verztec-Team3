@@ -20,6 +20,7 @@ Remove-Item "AWSCLIV2.msi" -Force
 $env:Path += ";C:\Program Files\Amazon\AWSCLIV2\"
 
 # 6. Install required Python packages
+# This is outdated
 & "C:\Program Files\Python311\python.exe" -m pip install `
   boto3 pdfplumber python-docx PyPDF2 openpyxl `
   lxml beautifulsoup4 sentence-transformers tqdm `

@@ -1,5 +1,8 @@
 # Document Processing and Embedding Pipeline
 
+**Disclaimer**
+The python files were based on an outdated version of the pipeline that has been changed due to a change in software architecture. This provides detailed instructions on how to set up the pipeline via AWS. However, due to the change architecture, to use this will constitute a change in the chatbot code as well. This simply serves as a reference. The aws_lambda code should still work, any need not be changed.
+
 The source code has 2 python files: 1 pipeline.py file, and a code for the lambda function
 
 This Python script processes raw documents containing the policies of the company, extracts the text, splits the content into chunks, generates embeddings, and uploads them into a vector database.
@@ -47,20 +50,15 @@ The trigger for the lambda function is the uploading of the __trigger__.ready fi
 ## Extraction Capabilities
 
 **File Types Supported**
-- PDF
-- DOCX, DOC
-- XLSX, XLS
-- PPTX, PPT
-- CSV
-- TXT
-- HTML
-- Markdown
 
+- `.pdf`
+- `.docx`
+- `.doc` (converted to `.docx` using Spire.Doc)
 
 **Handles:**
 - Lists (Nested, custom list icons)
-- Tables
-- Hyperlinks
+- Most tables (DOCX, DOC)
+- Hyperlinks (DOCX)
 
 **Limitations:**
 - Images are not processed
@@ -73,7 +71,7 @@ The trigger for the lambda function is the uploading of the __trigger__.ready fi
 Data is split into chunks for several important reasons:
 
 1. **Improved Search Relevance**  
-   Vector databases like FAISS work best with smaller, self-contained pieces of text. This allows the system to return precise and contextually relevant results.
+   Vector databases like Pinecone work best with smaller, self-contained pieces of text. This allows the system to return precise and contextually relevant results.
 
 2. **LLM Input Constraints**  
    Language models can only process a limited number of tokens. Chunking allows us to select only the most relevant text when forming a prompt.
@@ -147,4 +145,4 @@ Here are the steps to replicate the AWS infrastructure:
 
 
 Xue Cong
-13 May 2025
+23 May 2025
