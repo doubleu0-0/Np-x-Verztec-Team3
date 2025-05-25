@@ -4,17 +4,42 @@ function SignIn({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleSignIn = (e) => {
+  const handleSignIn = async (e) => {
     e.preventDefault();
 
-    // TODO: Implement authentication API call here
-    const isValid = email && password;
+    try {
+      const response = await fetch('http://localhost:8000/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
+      });
 
-    if (isValid) {
-      // For now, simulate a login success
-      onLogin(email); // You can pass user role here later from backend
-    } else {
-      alert('Please enter valid credentials.');
+      if (!response.ok) {
+        const errorData = await response.json();
+        alert(errorData.detail || 'Login failed');
+        return;
+      }
+
+      const data = await response.json();
+      const token = data.access_token;
+
+      // Store token (localStorage for now)
+      localStorage.setItem('token', token);
+
+      // Optional: Fetch profile info
+      const profileRes = await fetch('http://localhost:8000/profile', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const profileData = await profileRes.json();
+      console.log("User profile:", profileData);
+
+      onLogin(email);  // You can pass `profileData.message` instead if needed
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Login error. Please try again.');
     }
   };
 
