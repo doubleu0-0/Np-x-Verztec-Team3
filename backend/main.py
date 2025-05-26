@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 from pydantic import EmailStr
 from typing import Generator
 import io
+from fastapi import Request
 
 app = FastAPI()
 
@@ -241,29 +242,51 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 # === Routes ===
 @app.post("/login", response_model=TokenResponse)
-def login_user(user: UserLogin):
+def login_user(user: UserLogin, request: Request):
     db = get_db()
     cursor = db.cursor(pymysql.cursors.DictCursor)
+    status = "FAILURE"
+    user_id = None
 
     try:
         cursor.execute("SELECT * FROM users WHERE email = %s", (user.email,))
         user_record = cursor.fetchone()
+
+        if user_record and verify_password(user.password, user_record["password_hash"]):
+            user_id = user_record["user_id"]
+            status = "SUCCESS"
+
+            # Generate token
+            token = create_access_token({
+                "sub": user_record["username"],
+                "role": user_record["role"]
+            })
+
+            # Log successful login
+            cursor.execute("""
+                INSERT INTO login_logs (user_id, status)
+                VALUES (%s, %s)
+            """, (user_id, status))
+
+            db.commit()
+            return {"access_token": token, "token_type": "bearer"}
+
+        else:
+            # Log failed login (if user exists or not)
+            if user_record:
+                user_id = user_record["user_id"]
+
+            cursor.execute("""
+                INSERT INTO login_logs (user_id, status)
+                VALUES (%s, %s)
+            """, (user_id, status))
+
+            db.commit()
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
     finally:
         cursor.close()
         db.close()
-
-    if not user_record:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-
-    if not verify_password(user.password, user_record["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-
-    token = create_access_token({
-        "sub": user_record["username"],
-        "role": user_record["role"]
-    })
-
-    return {"access_token": token, "token_type": "bearer"}
 
 @app.get("/profile")
 def read_profile(token: str = Depends(oauth2_scheme)):
