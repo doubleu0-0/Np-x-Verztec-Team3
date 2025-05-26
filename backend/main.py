@@ -23,6 +23,8 @@ import pymysql
 import pymysql.cursors
 from datetime import datetime, timedelta
 from pydantic import EmailStr
+from typing import Generator
+import io
 
 app = FastAPI()
 
@@ -112,8 +114,8 @@ def extract_questions(user_input: str) -> list[str]:
 async def process_message(data: UserMessage):
     questions = extract_questions(data.message)
 
+    response_text = ""
     if not questions:
-        print("[INFO] No HR-related questions found. Generating fallback...")
         fallback_prompt = f"""
         The user said:
 
@@ -124,21 +126,71 @@ async def process_message(data: UserMessage):
         Keep your reply friendly and human-like.
         """
         fallback = light_llm.complete(fallback_prompt).text.strip()
-        return {"questions": [], "fallback": fallback}
+        response_text = fallback
+        result = {"questions": [], "fallback": fallback}
+    else:
+        response_text = "\n".join(questions)
+        result = {"questions": questions}
 
-    return {"questions": questions}
+    # Log conversation here
+    try:
+        conn = get_db()
+        with conn.cursor() as cursor:
+            sql = """
+                INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
+                VALUES (%s, %s, %s, %s)
+            """
+            user_id = 1  # Replace with dynamic user id if available
+            conversation_id = "1"  # Replace as needed
+
+            cursor.execute(sql, (user_id, conversation_id, data.message, response_text))
+        conn.commit()
+    finally:
+        conn.close()
+
+    return result
 
 
 @app.post("/stream")
 async def stream_answer(data: UserMessage):
-    def stream_generator():
-        print(f"[STREAM] Querying with: {data.message}")
-        response = query_engine.query(data.message)
+    user_prompt = data.message
+    print(f"[STREAM] Querying with: {user_prompt}")
 
+    response = query_engine.query(user_prompt)
+
+    # This buffer will store the full response for logging
+    full_response = []
+
+    def stream_generator() -> Generator[str, None, None]:
         for token in response.response_gen:
+            full_response.append(token)
             yield token
 
-    return StreamingResponse(stream_generator(), media_type="text/plain")
+    # This wrapper allows us to perform logging after streaming is complete
+    async def streaming_with_logging():
+        generator = stream_generator()
+        buffer = io.StringIO()
+        for token in generator:
+            buffer.write(token)
+            yield token
+        final_response = buffer.getvalue()
+
+        # Log to DB after full response is available
+        try:
+            conn = get_db()
+            with conn.cursor() as cursor:
+                sql = """
+                    INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
+                    VALUES (%s, %s, %s, %s)
+                """
+                user_id = 1
+                conversation_id = "1"
+                cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
+            conn.commit()
+        finally:
+            conn.close()
+
+    return StreamingResponse(streaming_with_logging(), media_type="text/plain")
 
 
 @app.post("/generate")
@@ -223,3 +275,35 @@ def read_profile(token: str = Depends(oauth2_scheme)):
         return {"message": f"Hello {username}, your token is valid!"}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+class ChatLog(BaseModel):
+    query: str
+    response: str
+
+# === Conversation Logging Endpoint ===
+@app.post("/log_conversation/")
+async def log_conversation(log: ChatLog):
+    try:
+        conn = get_db()
+        with conn.cursor() as cursor:
+            sql = """
+                INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
+                VALUES (%s, %s, %s, %s)
+            """
+
+            # Hardcoded user and conversation IDs
+            user_id = 1
+            conversation_id = "1"
+
+            cursor.execute(sql, (
+                user_id,
+                conversation_id,
+                log.query,
+                log.response
+            ))
+        conn.commit()
+        return {"message": "Conversation logged successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Logging failed: {str(e)}")
+    finally:
+        conn.close()
