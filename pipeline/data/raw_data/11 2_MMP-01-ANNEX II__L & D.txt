@@ -1,0 +1,23 @@
+ANNEX I - INSPECTION & TEST PLAN (Learning and Development Solutions)
+
+Process Activity: Scripts creation
+
+Acceptance Criteria: Must be approved by PM (Project Manager).
+Inspection & Test Method: Feedback provided by PM.
+Frequency / Sample Size: 100%
+Records Kept: Backup to Scripwriting Folder.
+Department & Person Responsible: PM, Scriptwriters.
+Process Activity: Courseware development
+
+Acceptance Criteria: Must be approved by PM and scriptwriters.
+Inspection & Test Method: Feedback provided by PM and scriptwriters.
+Frequency / Sample Size: 100%
+Records Kept: Back-up to Development Folder.
+Department & Person Responsible: Instructional Design Manager, Multimedia Developers, Scriptwriters.
+Process Activity: Final course delivery
+
+Acceptance Criteria: Must be approved by Verztec top management, Verztec internal staff, OR external clients (for client projects).
+Inspection & Test Method: Feedback provided by Verztec top management, internal staff, OR external clients.
+Frequency / Sample Size: 100%
+Records Kept: Back-up to Development > Beta/Charlie Folder.
+Department & Person Responsible: CEO, COO, PM.

@@ -5,6 +5,7 @@ import ChatInput from '@/components/ChatInput';
 import logo from '@/assets/images/logo.svg';
 import ModelSelector from '@/components/ModelSelector';
 
+
 function Chatbot() {
   const [messages, setMessages] = useImmer([]); // Stores chat messages
   const [newMessage, setNewMessage] = useState(''); // Stores the current input message
@@ -51,7 +52,7 @@ function Chatbot() {
         return;
       }
 
-      setStatus(`🔎 Extracted ${parsedQuestions.length} question(s).`);
+      setStatus(`Extracted ${parsedQuestions.length} question(s).`);
 
       const assistantIndexes = [];
 
@@ -100,7 +101,7 @@ function Chatbot() {
 
         setMessages(draft => {
           if (!draft[assistantIndex]) {
-            console.warn("❌ Invalid assistant index:", assistantIndex);
+            console.warn("Invalid assistant index:", assistantIndex);
             return;
           }
 
@@ -117,7 +118,7 @@ function Chatbot() {
         draft[assistantIndex].loading = false;
       });
 
-      setStatus("✅ Done.");
+      setStatus("Done :)");
     } catch (err) {
       setStatus(`✗ Stream error: ${err.message}`);
       setMessages(draft => {
@@ -138,9 +139,9 @@ function Chatbot() {
             {/* Centered Verztec logo and title */}
             <div className="flex flex-col items-center mb-6">
               <img src={logo} className="w-32 mb-2" alt="logo" />
-              <h1 className="font-urbanist text-2xl font-semibold text-gray-800 text-center">
-                Verztec's AI Assistant
-              </h1>
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
+              Verztec's AI Assistant
+            </h1>
             </div>
             <div className="font-urbanist text-primary-blue text-xl font-light space-y-2 text-center">
               <p>👋 Hi there!</p>

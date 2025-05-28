@@ -1,0 +1,65 @@
+Title: Design and Development
+
+Purpose: The purpose of this procedure is to define the design and development process for control and verify the design, assign functional responsibilities, define technical interfaces, ensure that the design output meets specified requirements and verify that it meets the design input requirements.
+
+Scope: This procedure applies to all design & development functions where the project is above S$ 30,000/-.
+
+Responsibility:
+
+The Individual Functional Head (Design & Development) / Project Manager / shall be responsible to ensure the design and development process conform to the specifications and quality requirements.
+The Project Manager shall ensure the design input requirements are established, documented, reviewed and approved.
+The Functional Head shall ensure that the design review, verification and validation are carried out as per plan and approved.
+The Functional Head shall ensure that changes to the design and development are identified, reviewed, verified, validated and approved before implementation.
+Functional Head shall ensure that Quality Records for design and development are maintained.
+Procedure:
+
+4.1 Planning:
+The Management Representative (MR) shall identify the Design & Development functions and their interphases and define responsibility & authorities for each Design & Development function.
+The MR shall plan for the design and development process to include:
+The stages of design and development.
+The required design review, verification, and validation activities.
+The responsibilities and authorities for design and development.
+The MR shall ensure effective communication between design and development functions and identify and address potential problems during the process.
+4.2 Input:
+The Project Manager shall identify and document the design input requirements for the product and ensure they are adequate, clear, complete, and unambiguous. These inputs include:
+Functional and performance requirements.
+Applicable statutory and regulatory requirements.
+Information derived from previous similar designs.
+Other requirements essential for design and development.
+The Project Manager shall ensure the design input requirements are reviewed and approved.
+4.3 Controls:
+4.3.1 Design & Development Review: At suitable stages, planned arrangements shall be made to conduct systematic reviews of design and development. Participants in such reviews shall include representatives of functions concerned with the design and development stage being reviewed. Records of the results of the reviews and any necessary actions shall be maintained. The objectives of the reviews are to:
+Evaluate the ability of the results of design and development to meet requirements.
+Identify any problems and propose necessary actions.
+4.3.2 Design & Development Verification: Verification shall be performed to ensure that the design and development outputs have met the design and development input requirements. Records of the results of the verification and any necessary actions shall be maintained.
+4.3.3 Design & Development Validation: Validation shall be performed in accordance with planned arrangements to ensure that the resulting product is capable of meeting the requirements for the specified application or intended use, where known. Validation shall be completed prior to the delivery or implementation of the product. Records of the results of validation and any necessary actions shall be maintained.
+4.4 Output:
+The Project Manager shall ensure that the outputs of the design and development are documented, clear, and unambiguous, and provide appropriate information for purchasing, production, and for service provision. The design output shall:
+Meet the input requirements for design and development.
+Provide appropriate information for purchasing, production, and service provision.
+Contain or reference product acceptance criteria.
+Specify the characteristics of the product that are essential for its safe and proper use.
+The design output shall be reviewed and approved by the Functional Head.
+4.5 Changes:
+Design and development changes shall be identified and records maintained. The changes shall be reviewed, verified, and validated, as appropriate, and approved before implementation. The review of design and development changes shall include evaluation of the effect of the changes on constituent parts and delivered products. Records of the results of the review of changes and any necessary actions shall be maintained.
+4.6 Monitoring (Checking) / Effective Actions:
+The Functional Head shall perform self-check to ensure details in this procedure are executed properly and undertake effective actions for full compliance.
+Internal auditors shall audit the implementation of this procedure to ensure full conformity.
+The Functional Head shall, after close-out of nonconformities from internal/external audits, propose improvement(s) in the Management Review meeting for top management approval.
+5. Reference Quality Records / Forms:
+
+Design & Development Plan
+Design Input
+Design Review Report
+Design Verification Report
+Design Validation Report
+Design Change Request
+Annex 1 - Design & Development Process Flow:
+
+1. Design Input: Customer Requirements, Functional Requirements, Statutory & Regulatory Requirements, Information from previous designs, Other requirements.
+2. Design Output: Design Specifications, Drawings, Material Specifications, Acceptance Criteria, Operational Instructions.
+3. Output Review: Review of design output, ensure design within specs, feasibility, review & sign off in output result.
+4. Design Verification: Submission to PM for verification & approval. Amend according to comments received.
+5. Design Validation: Verification by client by showing actual design - first draft (marketing or annual report design), LMS testing, UAT (web design, software).
+6. Final Approval / Design Change Control: Receive & review design change request. Advise client of cost implication. Confirmation by client. Modify design output. Final product.
+5.2 DESIGN AND DEVELOPMENT CHANGE CONTROL SYSTEM: This section presents a table for a change control system with columns for S/N, Specification, Description, Date, Version, History of Change, Requested By, and Done By.

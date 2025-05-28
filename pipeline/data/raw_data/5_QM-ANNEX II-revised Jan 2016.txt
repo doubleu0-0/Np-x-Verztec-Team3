@@ -1,0 +1,286 @@
+VERZTEC CONSULTING PTE LTD
+QUALITY MANUAL
+
+ANNEX II: QUALITY RESPONSIBILITIES & AUTHORITIES OF VARIOUS FUNCTIONS
+
+FUNCTION: MANAGEMENT RESPONSIBILITY
+
+TOP MANAGEMENT
+
+ISO 9001 QUALITY RESPONSIBILITY:
+
+-To provide commitment evidence to QMS and effectiveness improvement:
+Organization Communication: importance of meeting customer & statutory and regulatory requirements
+Establishment - Quality Policy
+Ensure establishment - measurable Quality Objectives at relevant functions & levels
+Conduct Management Review
+Ensure Resource Availability
+-To ensure customer requirements are determined & met for enhancing customer satisfaction.
+-To ensure QMS Planning and Integrity - despite changes.
+-To ensure Responsibility & Authority defined & communicated within organization.
+-To appoint Management Representative.
+-To ensure establishment of internal communication processes, including QMS & its effectiveness.
+-To review QMS at planned intervals for effectiveness, continual improvement & changes.
+To be accountable for the effectiveness of the quality management system.
+
+AUTHORITY (PIC):
+-CEO
+-Management Representative
+
+QP REF.:
+(Quality Manual)
+QP-SMQ-03
+
+FUNCTION: RESOURCE MANAGEMENT (STAFF FUNCTIONS)
+
+HUMAN RESOURCE
+
+ISO 9001 QUALITY RESPONSIBILITY:
+
+-To use competent personnel on works.
+-To determine quality competence needs.
+-To provide training or other actions.
+-To evaluate action effectiveness.
+-To ensure personnel aware of relevance & importance of their activities and how they can contribute to Quality Objectives achievement.
+-To maintain records of education, training, skill & experience.
+
+AUTHORITY (PIC):
+-COO
+
+QP REF.:
+QP-HRD-01
+
+FUNCTION: RESOURCE MANAGEMENT (STAFF FUNCTIONS)
+
+PURCHASING
+
+ISO 9001 QUALITY RESPONSIBILITY:
+
+-To ensure purchased product conforms to specified requirements.
+-To evaluate & select suppliers based on their ability to meet requirements - with selection, evaluation & re-evaluation criteria established; to maintain evaluation-result records.
+-To include (where appropriate) info and ensure purchase-requirement adequacy:
+requirements for approval of products, procedures, processes, equipment, personnel qualification, QMS
+-To establish & implement inspection or other activities:
+To ensure purchased product meets specified requirements
+-To state intended verification of organization or customer and product release method in purchasing info.
+-To identify & control all outsourced process for product conformity.
+
+AUTHORITY (PIC):
+-CEO
+-COO
+-Manager
+-Consultant
+
+QP REF.:
+QP-PSC-01
+
+
+FUNCTION: RESOURCE MANAGEMENT (STAFF FUNCTIONS)
+
+MAINTENANCE (INFRASTRUCTURE)
+
+ISO 9001 QUALITY RESPONSIBILITY:
+-To determine, provide and maintain infrastructure:
+buildings, workspace & associated utilities
+process equipment (hardware & software)
+supporting services (e.g. transport, communication or information systems)
+
+AUTHORITY (PIC):
+-COO
+
+QP REF.:
+QP-MTN-01
+
+FUNCTION: RESOURCE MANAGEMENT (STAFF FUNCTIONS)
+
+TECHNICAL / LEGAL DOCUMENT CONTROL
+
+ISO 9001 QUALITY RESPONSIBILITY:
+-To control QMS-required and external-origin documents determined to be necessary for planning and operation of the QMS / drawings / codes / standards / regulations for:
+approval • review & update • changes • identification • access • availability • use of obsolete docs
+
+AUTHORITY (PIC):
+-Consultant
+-Management Representative
+-Design Team
+
+QP REF.:
+QP-SMQ-04
+QP-SMQ-03
+
+FUNCTION: PRODUCT REALIZATION (LINE FUNCTIONS)
+
+SALES CONTRACTS (CUSTOMER-RELATED PROCESS)
+
+ISO 9001 QUALITY RESPONSIBILITY:
+
+-To determine statutory and regulatory requirements applicable to product requirements.
+-To review product requirements and validations, and maintain review & action records.
+-To determine and implement effective customer communication:
+Including changes & complaints
+-To handle complaints for customer satisfaction.
+
+AUTHORITY (PIC):
+-CEO
+-COO
+-Manager
+-Consultant
+-Design Team
+
+QP REF.:
+QP-SAL-01
+QP-SMQ-02
+QP-SMQ-03
+
+
+FUNCTION: PRODUCT REALIZATION (LINE FUNCTIONS)
+
+PROCESS & SERVICE (OPERATIONS CONTROL)
+
+ISO 9001 QUALITY RESPONSIBILITY:
+-To plan & carry out production or service, under controlled conditions - including product characteristics, suitable equipment, MM (Monitoring & Measurement IMM), product release, delivery & post-delivery activities
+-To ensure supplier control for outsourcing work
+-To validate "special" processes
+-To provide positive product identification & traceability, throughout product realization
+-To obtain and maintain identification of a product and maintain record, where traceability is a requirement
+-To preserve the product by backing up data in the server for storage, and protect from virus using anti-virus software
+-To identify, verify, protect and safeguard customer property, including Intellectual Property, to report to customer if customer property is lost, damaged or unsuitable for use and maintain record
+-To train, brief & supervise work and to control process to Process Plans
+-To implement product release, delivery & post-delivery activities
+-To supervise & manage work environment for product requirements conformity
+-To plan & implement Work Supervision or Process Control (Process Monitoring & Measurement) • Vendor Control • Customer Satisfaction • Data Analysis • Improvement process for product & QMS conformity and QMS effectiveness improvement - methods shall include statistical technique applicability
+-To determine, collect & analyze data for informed management decision
+-To commend for effective actions to prevent recurrence (corrective action) and prevent occurrence (preventive action) while continually improve QMS effectiveness
+
+AUTHORITY (PIC):
+-CEO
+-COO
+-Manager
+-Consultant
+-Design Team
+
+QP REF.: 
+QP-OPS-01
+QP-SMQ-02
+QP-SMQ-03
+
+
+FUNCTION: PRODUCT REALIZATION (LINE FUNCTIONS)
+
+PRODUCT QUALITY (MONITORING & MEASUREMENT CONTROL)
+
+ISO 9001 QUALITY RESPONSIBILITY:
+-To inspect & test products to Inspection & Test Plan
+-To maintain evidence of conformity with the acceptance criteria, to keep record of person(s) authorizing release of product for delivery to the customer
+-To identify the product status concerning monitoring & measurement throughout product realization
+-To control non-conforming product, also to record action or concession and to re-verify
+-To ensure necessary product recall & procedures
+-To plan & implement Inspection & Test Plan (Product or Service Monitoring & Measurement) •Customer Satisfaction • Data Analysis • Improvement process for product & QMS conformity and QMS effectiveness improvement - methods shall include statistical technique applicability
+-To determine, collect & analyze data for informed management decision
+-To command for effective actions to prevent recurrence (corrective action) and prevent occurrence (preventive action) while continually improve QMS effectiveness
+
+AUTHORITY (PIC):
+-CEO
+-COO
+-Manager
+-Consultant
+-Design Team
+
+QP REF.:
+QP-MMP-01
+QP-SMQ-02
+QP-SMQ-03
+
+FUNCTION: PRODUCT REALIZATION (LINE FUNCTIONS)
+CUSTOMER SATISFACTION
+
+ISO 9001 QUALITY RESPONSIBILITY:
+-To monitor information relating to customer perception as to meeting customer requirements
+-To determine method for Info-Collection & Use
+-To plan & implement Customer-Satisfaction Monitoring • Data Analysis • Improvement process for product & QMS conformity and QMS effectiveness improvement
+   -methods shall include statistical technique applicability
+-To determine, collect & analyze data for informed management decision
+-To commend for effective actions to prevent recurrence (corrective action) and prevent occurrence (preventive action) while continually improve QMS effectiveness
+
+AUTHORITY (PIC):
+-CEO
+-COO
+-Manager
+-Consultant
+
+QP REF.: 
+QP-CS-01
+
+FUNCTION: SYSTEM CONTROL
+
+MANAGEMENT REPRESENTATIVE
+
+ISO 9001 QUALITY RESPONSIBILITY:
+-To ensure establishment, implementation & maintenance of QMS process
+-To report to top management on QMS performance and improvement needs
+-To ensure promotion of awareness of customer requirements throughout organization
+-To liaise with external parties on QMS matters
+
+AUTHORITY (PIC):
+Management Representative
+
+QP REF.: 
+(Quality Manual)
+
+FUNCTION: INTERNAL AUDIT
+
+ISO 9001 QUALITY RESPONSIBILITY:
+-To conduct internal yet independent audit at planned intervals - to ensure ISO & QMS effectiveness, leading to close-out of NCRs
+-To plan & implement Internal Audit (Management System Monitoring & Measurement) • Data Analysis • Improvement process for product & QMS conformity and QMS effectiveness improvement
+   -methods shall include statistical technique applicability
+-To determine, collect & analyze data for informed management decision
+-To command for effective actions to prevent recurrence (corrective action) and prevent occurrence (preventive action)
+   -while continually improve QMS effectiveness
+
+AUTHORITY (PIC):
+-Management Representative
+-Internal Auditors
+
+QP REF.:
+QP-SMQ-01
+QP-SMQ-02
+
+FUNCTION: MANAGEMENT REVIEW
+
+ISO 9001 QUALITY RESPONSIBILITY:
+-(top management) to review QMS at planned intervals for effectiveness, improvement and necessary changes
+-To document such review
+
+AUTHORITY (PIC):
+-CEO
+-Management Representative
+
+QP REF.: 
+QP-SMQ-03
+
+FUNCTION: QMS DOCUMENT CONTROL
+
+ISO 9001 QUALITY RESPONSIBILITY:
+-To be kept to a minimum (for effectiveness & efficiency)
+-To control QMS-required & external origin documents determined to be necessary for planning and operation of the QMS for:
+approval • review & update • changes • identification • access • availability • use of obsolete docs
+-To revise documents - basing on lessons learned from corrective action, emergency & management review
+
+AUTHORITY (PIC):
+-Management Representative
+-Document Controller
+QP REF.: 
+QP-SMQ-04
+
+FUNCTION: RECORD CONTROL
+
+ISO 9001 QUALITY RESPONSIBILITY:
+-To establish & maintain records as evidence for conformity, to ensure legibility, ready identification, activity traceability and retrievability
+-To control for identification, storage, protection, retrieval, retention and disposition of records
+
+AUTHORITY (PIC):
+-Management Representative
+-Document Controller
+
+QP REF.: 
+QP-SMQ-05

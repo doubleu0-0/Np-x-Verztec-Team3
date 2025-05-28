@@ -6,7 +6,9 @@ import SignIn from '@/components/SignIn';
 import ProfileDropdown from '@/components/ProfileDropdown';
 import ModelSelector from '@/components/ModelSelector';
 import UploadXlsxButton from '@/components/UploadXlsxButton';
+import UploadFile from '@/components/UploadFile';
 import logo from '@/assets/images/logo.svg';
+import ReactMarkdown from 'react-markdown';
 
 function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -34,7 +36,7 @@ function App() {
   };
 
   const handleNewChat = () => {
-    console.log("New Chat Triggered");
+    setView('chat');
   };
 
   const handleSearch = () => {
@@ -42,7 +44,6 @@ function App() {
   };
 
   const handleLogin = (email) => {
-    console.log("Logged in as", email);
     setIsLoggedIn(true);
   };
 
@@ -53,8 +54,10 @@ function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-cover bg-center flex items-center justify-center"
-           style={{ backgroundImage: "url('/src/assets/images/background.png')" }}>
+      <div
+        className="min-h-screen bg-cover bg-center flex items-center justify-center"
+        style={{ backgroundImage: "url('/src/assets/images/background.png')" }}
+      >
         <SignIn onLogin={handleLogin} />
       </div>
     );
@@ -62,54 +65,86 @@ function App() {
 
   return (
     <div className={`flex h-screen overflow-hidden ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
+      {/* Sidebar */}
       <Sidebar onNewChat={handleNewChat} onSearch={handleSearch} />
-      <div className="flex flex-col flex-1 max-w-3xl mx-auto px-4">
-        <header className="sticky top-0 shrink-0 z-20 bg-inherit">
-          <div className="flex justify-between items-center pt-4 pb-2">
-            {/* Left: Logo */}
-            <a href="https://www.verztec.com">
-              <img src={logo} className="w-32" alt="logo" />
-            </a>
-            {/* Center: Model Selector and Toggle Buttons */}
-            <div className="flex items-center gap-4">
-              <ModelSelector selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setView('chat')}
-                  className={`px-3 py-1 text-sm rounded ${
-                    view === 'chat' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
-                  }`}
-                >
-                  Chat
-                </button>
-                <button
-                  onClick={() => setView('upload')}
-                  className={`px-3 py-1 text-sm rounded ${
-                    view === 'upload' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
-                  }`}
-                >
-                  Upload Excel
-                </button>
+
+      {/* Main Content */}
+      <div className="flex flex-col flex-1 overflow-y-auto">
+        {/* Title aligned top-left beside Sidebar */}
+        <div className="px-6 pt-4 pb-2 flex items-center gap-4">
+          <img src={logo} className="w-32" alt="logo" />
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
+            Verztec's AI Assistant
+          </h1>
+        </div>
+
+        {/* Chat area container */}
+        <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6">
+          <div className="w-full max-w-5xl flex flex-col">
+            {/* Header with ModelSelector, View Buttons, and ProfileDropdown */}
+            <header className="flex justify-between items-center mb-4 sticky top-0 bg-inherit z-20">
+              <div className="flex items-center gap-4">
+                <ModelSelector selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setView('chat')}
+                    className={`px-3 py-1 text-sm rounded ${
+                      view === 'chat' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                    }`}
+                  >
+                    Chat
+                  </button>
+                  <button
+                    onClick={() => setView('uploadXlsx')}
+                    className={`px-3 py-1 text-sm rounded ${
+                      view === 'uploadXlsx' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                    }`}
+                  >
+                    Upload Excel
+                  </button>
+                  <button
+                    onClick={() => setView('uploadFile')}
+                    className={`px-3 py-1 text-sm rounded ${
+                      view === 'uploadFile' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                    }`}
+                  >
+                    Upload File
+                  </button>
+                </div>
               </div>
-            </div>
-            {/* Right: Profile */}
-            <ProfileDropdown
-              selectedProfile={selectedProfile}
-              setSelectedProfile={setSelectedProfile}
-              theme={isDarkMode ? 'dark' : 'light'}
-              toggleTheme={toggleTheme}
-              onLogout={handleLogout}
-            />
+              <ProfileDropdown
+                selectedProfile={selectedProfile}
+                setSelectedProfile={setSelectedProfile}
+                theme={isDarkMode ? 'dark' : 'light'}
+                toggleTheme={toggleTheme}
+                onLogout={handleLogout}
+              />
+            </header>
+
+            {/* Main View */}
+            <main className="flex-1">
+              {view === 'chat' && <Chatbot selectedModel={selectedModel} setSelectedModel={setSelectedModel} />}
+              {view === 'uploadXlsx' && <UploadXlsxButton />}
+              {view === 'uploadFile' && <UploadFile />}
+              {view === 'markdown' && (
+                <div className="prose max-w-full">
+                  <ReactMarkdown
+                    components={{
+                      a: (props) => (
+                        <a {...props} target="_blank" rel="noopener noreferrer" />
+                      )
+                    }}
+                  >
+                    {markdownContent}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </main>
           </div>
-        </header>
-        <main className="flex-1 mt-4">
-          {view === 'chat' ? (
-            <Chatbot selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
-          ) : (
-            <UploadXlsxButton />
-          )}
-        </main>
+        </div>
       </div>
+
+      {/* Search Popup */}
       <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>
   );

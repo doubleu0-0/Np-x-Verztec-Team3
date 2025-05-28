@@ -1,0 +1,23 @@
+ANNEX I - INSPECTION & TEST PLAN (TRANSLATING)
+
+Process Activity: Examination of translators language level
+
+Acceptance Criteria: Allocation of 2 graders for grading.
+Inspection & Test Method: Grading by appointed senior translator.
+Frequency / Sample Size: 100%
+Records Kept: Web Resource Pool.
+Department & Person Responsible: CEO, COO, Vendor Manager, Manager, Consultant.
+Process Activity: Translator Evaluation
+
+Acceptance Criteria: Filling / giving feedback by customer.
+Inspection & Test Method: Customer feedback.
+Frequency / Sample Size: Every project (whenever possible except for repeated customers).
+Records Kept: Customer Feedback / Complaint Form.
+Department & Person Responsible: CEO, COO, Vendor Manager, Manager, Consultant.
+Process Activity: Deliberation
+
+Acceptance Criteria: Meeting with staff.
+Inspection & Test Method: Borderline cases are reviewed.
+Frequency / Sample Size: 100%
+Records Kept: Meeting Report.
+Department & Person Responsible: CEO, COO, Vendor Manager, Manager, Consultant.

@@ -48,10 +48,11 @@ from llama_index.core.storage.index_store import SimpleIndexStore
 from llama_index.core.storage.kvstore.simple_kvstore import SimpleKVStore
 from bs4 import BeautifulSoup, Tag, NavigableString
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RAW_DATA = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'raw_data'))
-LOG_FILE = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'Logs', 'processed_files.json'))
-
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print(f"Project root: {PROJECT_ROOT}")
+RAW_DATA = os.path.abspath(os.path.join(PROJECT_ROOT, 'data', 'raw_data'))
+LOG_FILE = os.path.abspath(os.path.join(PROJECT_ROOT, 'data', 'Logs', 'processed_files.json'))
+PERSIST_DIR = os.path.join(PROJECT_ROOT, 'data', 'Embedded')
 
 # This one is for embeding USER query
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2") # MUST BE SAME AS THE ONE USED FOR INDEXING
@@ -66,9 +67,9 @@ embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
 
 # Set Ollama as the default LLM globally
 Settings.llm = Ollama(model="llama3.2", context_window=4096, timeout=120)
-persist_dir = "../data/Embedded"
+
 faiss_path = "faiss.index"
-faiss_file_path = os.path.join(persist_dir, faiss_path)
+faiss_file_path = os.path.join(PERSIST_DIR, faiss_path)
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
@@ -540,7 +541,7 @@ def split_into_documents(text, chunk_size=1000, chunk_overlap=200, title="Untitl
 
 # 3. Embedding + Saving
 
-def build_or_append_index(documents, embed_model, persist_dir="../data/Embedded", faiss_path="faiss.index", embedding_dim=1024):
+def build_or_append_index(documents, embed_model, persist_dir="pipeline/data/Embedded", faiss_path="faiss.index", embedding_dim=1024):
     """
     Create or append to a FAISS + LlamaIndex index.
 
@@ -660,14 +661,14 @@ def run_pipeline(raw_folder):
         extracted_text = extract_text_from_file(file_path)
 
         documents = split_into_documents(extracted_text, title=filename, source=filename)
-        build_or_append_index(documents, embed_model, persist_dir="../data/Embedded", faiss_path="faiss.index", embedding_dim=1024)
+        build_or_append_index(documents, embed_model, persist_dir=PERSIST_DIR, faiss_path=faiss_file_path, embedding_dim=1024)
         new_files.append(filename)
 
     # Update log file
     processed_files.update(new_files)
     with open(LOG_FILE, "w") as f:
-        json.dump(list(processed_files), f)
-    
+        json.dump(list(processed_files), f, indent=2)
+
     print("Pipeline completed. Database has been updated!")
 
 if __name__ == "__main__":

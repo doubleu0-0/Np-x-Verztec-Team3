@@ -206,7 +206,9 @@ async def stream_answer(data: UserMessage):
             base = os.path.splitext(filename)[0]
             for ext in [".pdf", ".docx", ".doc"]:
                 real_path = base + ext
-                if os.path.exists(f"pipeline/raw_data/{real_path}"):
+                # Use the correct upload directory
+                file_path = os.path.join(UPLOAD_DIR, real_path)
+                if os.path.exists(file_path):
                     return real_path
             return filename  # fallback
 

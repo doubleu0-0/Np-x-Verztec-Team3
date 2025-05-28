@@ -1,0 +1,93 @@
+TITLE: PURCHASING & EXTERNAL PROVIDER CONTROL 
+
+1. Purpose: To define a Purchase Control system to ensure that materials/products/works/services supplied conform to customer's specifications and/or in-house quality requirements, including external provider control.
+2. Scope: This procedure applies to all purchases, including direct/indirect materials, capital purchases, and outsourcing works/services, etc..
+3. Responsibility:
+The Purchaser (i.e., CEO, COO, Manager, and Consultants) has the main responsibility for ensuring a systematic approach in controlling purchases and that supplied materials/products/works/services conform to customer specifications and/or in-house quality requirements, including outsourced works/services.
+The Purchaser/Operations PIC is responsible for external provider assessment.
+4. Procedure:
+4.1 Planning:
+4.1.1 The Purchaser shall review previous and current Web Resource Pool (Form No. PSC-QR-04), Approved External Provider List (AEPL) (Form No. PSC-QR-01), and external provider assessment results to initiate actions for improved external provider control.
+4.1.2 External Providers Sourcing, Evaluation and Selection:
+New external providers shall be assessed and selected based on Table 1 External Provider Control Plan.
+The Purchaser shall request new external provider information, review the data, and submit it to Management for approval. 
+The external provider should have a minimum of 2 years experience in supplying similar materials/products/works/services.
+The external provider should preferably have a Quality System (or be certified to ISO 9001) and necessary product/service certifications.
+Upon approval, the Purchaser shall update the new supplier into the Web Resource Pool and/or Approved External Provider List (AEPL).
+4.2 Execution:
+4.2.1 Purchasing Process:
+The Purchaser shall obtain quotations from external providers, which may be from approved external providers listed in the AEPL or from new sources.
+The Purchaser shall compare quotations and shortlist the most qualified or suitable external provider. Selection criteria include: 
+ability to meet specifications/quality requirements 
+delivery lead time 
+service 
+ISO 9001 certification needs 
+Any qualified credentials/portfolio of clients/past experiences 
+If the selected external provider is not from the Web Resource Pool or AEPL, the Purchaser shall pre-qualify the new external provider (see para. 4.1.2).
+Upon successful pre-qualification, the new external provider shall be listed into the Web Resource Pool/AEPL.
+The Purchaser shall raise a Purchase Order (P.O.) (Form No. PSC-QR-02 for sample) to the selected external provider in Category D and follow-up on delivery. For other categories, refer to the Purchasing method in Table 1 External provider Control Plan.
+4.2.2 Purchase Order or Document Preparation, Review and Approval:
+When preparing a P.O., the Purchaser shall ensure all columns are completed and applicable data are included, such as:
+Description of Services provided 
+Type of Services 
+Quantity, Unit of Measurement, Per unit rate and total amount 
+Currency and Grand Total 
+Deadline 
+Deliverables 
+Terms of Payment 
+Instructions & quality terms to suppliers 
+Vendor name and email 
+Date issued 
+Requestor, and requestors email 
+The P.O. shall be reviewed and approved by authorized personnel, who shall ensure all applicable data and a positive description of the purchased material/product/work/service are included, especially quality terms.
+Verification at external provider Premises:
+If contractually required, the Purchaser shall ensure verification activity details (i.e., Inspection or Testing Plan/Method/PO/DO) are specified in purchase documents.
+Such verification activities at external provider premises do not preclude the Company from subsequent rejection upon delivery/rendering of materials/products/works/services.
+Verification by Customer:
+If specified in the Sales Contract, the customer will have the right to verify any purchased materials/products/works/services at the Company's or supplier's premises. The supplier shall be committed in the P.O..
+
+Such verification activities by the customer shall not preclude them from subsequent rejection of rendered services.
+The end user shall conduct independent monitoring of suppliers' materials/products/works/services to measure the effective control of quality.
+4.2.3 Amendments to Purchasing Documents:
+The Purchaser is authorized to make amendments to purchasing documents.
+Amendments shall be made on the original P.O. and endorsed by the approving authority.
+The Purchaser shall ensure amended data clearly describes the purchased materials/products/works/services.
+4.3 Monitoring (Checking):
+4.3.1 Control of Purchased Materials/Works:
+The Operations PIC shall perform incoming inspection/verification of purchased materials according to contract specifications or requirements in the Inspection/test plan/DO/PO, or the external provider Control Plan.
+The Operations PIC shall ensure purchased/outsourced works are executed and controlled according to contract specifications or requirements in the Operations Control Plan, or the external provider Control Plan.
+The Operations PIC shall issue Corrective Action Request to suppliers for major product quality problems impacting fitness for use.
+4.3.2 Supplier Control:
+To further ensure supplied materials/products/works/services conform to customer's specification and/or in-house requirements, performance review and incoming inspection/test plan/PO/DO shall be carried out in accordance with para. 4.1.2 in this procedure and QP-MMP-01.
+4.3.3 Existing external provider Assessment/Review:
+The Purchaser/Operations PIC shall perform assessment review of external providers either yearly or as required.
+Supplier status shall be maintained with the Web Resource Pool/ASL based on assessment results in the Web Resource Pool - Performance Assessment Form (Form No. PSC-QR-05 for sample) and Supplier Performance Assessment Form (Form No. PSC-QR-03).
+Delisting of Existing Supplier:
+The Purchaser/Operations PIC shall advise the external provider in writing of any nonconforming materials/products/works/services and put them on "Reviewed" status.
+The external provider shall be revoked after two consecutive rejections if there's no indication of management response to corrective action or its reminder, and no evidence of improvement, unless Top Management decides otherwise.
+A "Reviewed" external provider may be re-graded as "Approved" once two subsequent deliveries/services are accepted.
+The Web Resource Pool and AEPL shall be updated once an external provider is delisted.
+Demerit Point System:
+The Operations PIC shall assess existing external provider performance based on the Vendor/external provider Evaluation Demerit Point System (Annex I).
+The Operations PIC shall inform the external provider before updating the extranet. An email copy will be sent to the external provider, and the total score will automatically update on the system.
+
+4.3.4 The Purchaser shall perform self-check half-yearly to ensure all stipulated details in this procedure are properly executed.
+4.3.5 The internal auditor shall audit this procedure to ensure full conformity.
+4.4 Data Analysis/Corrective Action:
+4.4.1 The Purchaser shall collect data based on:
+existing supplier assessment 
+supplier corrective actions 
+4.4.2 The Purchaser shall analyze this data to identify how to work with suppliers for corrective actions.
+4.4.3 External provider Corrective Action: Please refer to para. 4.3.1.3 and QP-SMQ-02 for external provider Corrective Action.
+4.4.4 Upon receiving feedback on external providers corrective action, the Purchaser shall determine:
+if root-cause(s) have been correctly identified;
+whether the external provider has closed out the issue within the committed time-frame.
+4.4.5 The Purchaser shall follow-up on the effectiveness of the corrective action close-out and be assured of no recurrence of the same problem.
+4.4.6 The Purchaser shall feedback any unfavorable trend over the past year to major suppliers and initiate an External provider Improvement Plan for these suppliers.
+4.4.7 The Purchaser shall, after close-out of nonconformities from internal/external audits, propose improvement(s) in the Management Review meeting for top management's approval.
+5. Reference Quality Records/Forms:
+Approved External provider List (AEPL) 
+Purchase Order [sample] 
+External provider Performance Assessment Form 
+Web Resource Pool [sample] 
+Web Resource Pool - Performance Assessment Form
