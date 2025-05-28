@@ -33,6 +33,11 @@ import re
 import faiss
 import io
 import os
+import shutil 
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+UPLOAD_DIR = os.path.join(PROJECT_ROOT, "pipeline", "data", "raw_data")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI()
 
@@ -53,13 +58,23 @@ llm = Ollama(model="llama3.2:latest", request_timeout=120.0, temperature=0, cont
 Settings.llm = llm
 
 # FAISS index loading
-persist_dir = "../Embedded"
+persist_dir = os.path.join(PROJECT_ROOT, "pipeline", "data", "Embedded")
 faiss_path = "faiss.index"
-faiss_index = faiss.read_index(os.path.join(persist_dir, faiss_path))
-vector_store = FaissVectorStore(faiss_index=faiss_index)
-storage_context = StorageContext.from_defaults(persist_dir=persist_dir, vector_store=vector_store)
-index = load_index_from_storage(storage_context)
-query_engine = index.as_query_engine(similarity_top_k=5, streaming = True)
+faiss_index_path = os.path.join(persist_dir, faiss_path)
+
+if os.path.exists(faiss_index_path):
+    faiss_index = faiss.read_index(faiss_index_path)
+    vector_store = FaissVectorStore(faiss_index=faiss_index)
+    storage_context = StorageContext.from_defaults(persist_dir=persist_dir, vector_store=vector_store)
+    index = load_index_from_storage(storage_context)
+    query_engine = index.as_query_engine(similarity_top_k=5, streaming=True)
+else:
+    faiss_index = None
+    vector_store = None
+    storage_context = None
+    index = None
+    query_engine = None
+    print(f"WARNING: FAISS index not found at {faiss_index_path}. Vector search will be unavailable until the index is built.")
 
 # This is llama-mini
 
@@ -78,7 +93,7 @@ Your task is to extract all meaningful HR-related questions or concerns from the
 For each item:
 - Assign a concise label (e.g., "Leave entitlement", "Workplace harassment")
 - Rewrite the question or concern in a short, clear form — **do not add explanations, notes, or assumptions**
-- Only include relevant HR-related content, not exhaustive-(e.g., leave, claims, WFH, offboarding policy, policies, pantry, etiquette, misconduct, benefits, office or organisation-related matters)
+- Only include relevant HR-related content, not exhaustive-(e.g., leave, claims, WFH, policies, pantry, etiquette, misconduct, benefits, office or organisation-related matters)
 - Always rewrite from the user's point of view using "I" instead of "you" unless specified
 - Ignore all non-HR and off-topic content
 
@@ -187,16 +202,28 @@ async def stream_answer(data: UserMessage):
         for token in response.response_gen:
             yield token
 
+        def get_real_file(filename):
+            base = os.path.splitext(filename)[0]
+            for ext in [".pdf", ".docx", ".doc"]:
+                real_path = base + ext
+                if os.path.exists(f"pipeline/raw_data/{real_path}"):
+                    return real_path
+            return filename  # fallback
+
         # Generate citations (Only show the unqiue files of the top 3 nodes)
         top_nodes = response.source_nodes[:3]
 
         cited_docs = {}
         for node_score in top_nodes:
             node = node_score.node
-            filename = node.metadata.get("source") or node.metadata.get("title")
-            if filename and filename not in cited_docs:
-                url = f"http://localhost:8000/download/{quote(filename)}"
-                cited_docs[filename] = url
+            original = node.metadata.get("source") or node.metadata.get("title")
+            if not original:
+                continue
+
+            real_file = get_real_file(original)
+            if real_file not in cited_docs:
+                url = f"http://localhost:8000/download/{quote(real_file)}"
+                cited_docs[real_file] = url
 
         # Yield citations section only if there are valid docs
         if cited_docs:
@@ -234,7 +261,7 @@ async def stream_answer(data: UserMessage):
 # Download files
 @app.get("/download/{filename}")
 def download_file(filename: str):
-    path = os.path.join("..", "raw_data", filename)
+    path = os.path.join(PROJECT_ROOT, "pipeline", "data", "raw_data", filename)
     return FileResponse(path)
 
 
@@ -440,6 +467,14 @@ async def upload_xlsx(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
     
+@app.post("/upload-file")
+async def upload_file(file: UploadFile = File(...)):
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    print(f"Saving file to: {file_path}")
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return {"message": f"File '{file.filename}' uploaded successfully."}
+
 
 # Serve React frontend
 app.mount(
