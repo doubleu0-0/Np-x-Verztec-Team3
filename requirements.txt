@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+ollama
+python-dotenv
+requests
+python-jose
+bycrypt
+pymysql
+pydantic[email]
+openpyxl
+python-multipart
