@@ -4,7 +4,8 @@ import SearchPopup from '@/components/SearchPopup';
 import Chatbot from '@/components/Chatbot';
 import SignIn from '@/components/SignIn';
 import ProfileDropdown from '@/components/ProfileDropdown';
-import ModelSelector from '@/components/ModelSelector'; // <-- import
+import ModelSelector from '@/components/ModelSelector';
+import UploadXlsxButton from '@/components/UploadXlsxButton';
 import logo from '@/assets/images/logo.svg';
 
 function App() {
@@ -14,7 +15,8 @@ function App() {
     return localStorage.getItem('theme') === 'dark';
   });
   const [selectedProfile, setSelectedProfile] = useState(null);
-  const [selectedModel, setSelectedModel] = useState('llama3.2:latest'); // <-- add
+  const [selectedModel, setSelectedModel] = useState('llama3.2:latest');
+  const [view, setView] = useState('chat');
 
   useEffect(() => {
     const root = document.documentElement;
@@ -64,10 +66,33 @@ function App() {
       <div className="flex flex-col flex-1 max-w-3xl mx-auto px-4">
         <header className="sticky top-0 shrink-0 z-20 bg-inherit">
           <div className="flex justify-between items-center pt-4 pb-2">
-            <div>
-              {/* Replace title with ModelSelector */}
+            {/* Left: Logo */}
+            <a href="https://www.verztec.com">
+              <img src={logo} className="w-32" alt="logo" />
+            </a>
+            {/* Center: Model Selector and Toggle Buttons */}
+            <div className="flex items-center gap-4">
               <ModelSelector selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setView('chat')}
+                  className={`px-3 py-1 text-sm rounded ${
+                    view === 'chat' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                  }`}
+                >
+                  Chat
+                </button>
+                <button
+                  onClick={() => setView('upload')}
+                  className={`px-3 py-1 text-sm rounded ${
+                    view === 'upload' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                  }`}
+                >
+                  Upload Excel
+                </button>
+              </div>
             </div>
+            {/* Right: Profile */}
             <ProfileDropdown
               selectedProfile={selectedProfile}
               setSelectedProfile={setSelectedProfile}
@@ -77,7 +102,13 @@ function App() {
             />
           </div>
         </header>
-        <Chatbot selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+        <main className="flex-1 mt-4">
+          {view === 'chat' ? (
+            <Chatbot selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+          ) : (
+            <UploadXlsxButton />
+          )}
+        </main>
       </div>
       <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>

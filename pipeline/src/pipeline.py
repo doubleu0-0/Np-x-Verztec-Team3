@@ -46,10 +46,12 @@ from llama_index.core.node_parser import SimpleNodeParser
 from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.core.storage.index_store import SimpleIndexStore
 from llama_index.core.storage.kvstore.simple_kvstore import SimpleKVStore
+from bs4 import BeautifulSoup, Tag, NavigableString
 
-BASE_DIR = r'C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\Beep_Boop\pipeline\src'
-RAW_DATA = r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\Beep_Boop\pipeline\data\raw_data"
-LOG_FILE = os.path.join(BASE_DIR, '..', 'data', 'Logs', 'processed_files.json')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+RAW_DATA = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'raw_data'))
+LOG_FILE = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'Logs', 'processed_files.json'))
+
 
 # This one is for embeding USER query
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2") # MUST BE SAME AS THE ONE USED FOR INDEXING
@@ -68,7 +70,6 @@ persist_dir = "../data/Embedded"
 faiss_path = "faiss.index"
 faiss_file_path = os.path.join(persist_dir, faiss_path)
 
-file = r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\sample docs for PM dept\Follow Ups_Importance.pdf"
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
@@ -564,7 +565,7 @@ def build_or_append_index(documents, embed_model, persist_dir="../data/Embedded"
             vector_store=vector_store
         )
         index = load_index_from_storage(storage_context)
-
+        print("Total docs in index:", len(index.storage_context.docstore.docs))
         # Append the new documents
         parser = SimpleNodeParser()
         nodes = parser.get_nodes_from_documents(documents)
@@ -598,6 +599,7 @@ def build_or_append_index(documents, embed_model, persist_dir="../data/Embedded"
         )
 
     print("Saving new data...")
+    print("Total docs in index:", len(index.storage_context.docstore.docs))
     index.storage_context.persist(persist_dir=persist_dir)
     faiss.write_index(faiss_index, faiss_file_path)
 
