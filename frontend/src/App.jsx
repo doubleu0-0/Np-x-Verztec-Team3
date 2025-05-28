@@ -51,8 +51,10 @@ function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-cover bg-center flex items-center justify-center"
-           style={{ backgroundImage: "url('/src/assets/images/background.png')" }}>
+      <div
+        className="min-h-screen bg-cover bg-center flex items-center justify-center"
+        style={{ backgroundImage: "url('/src/assets/images/background.png')" }}
+      >
         <SignIn onLogin={handleLogin} />
       </div>
     );
@@ -60,32 +62,43 @@ function App() {
 
   return (
     <div className={`flex h-screen overflow-hidden ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
-      <div className="flex">
-        <Sidebar onNewChat={handleNewChat} onSearch={handleSearch} />
-        <div className="flex items-center pl-4 pr-6 py-4 whitespace-nowrap">
+      
+      {/* Sidebar */}
+      <Sidebar onNewChat={handleNewChat} onSearch={handleSearch} />
+
+      {/* Main Content */}
+      <div className="flex flex-col flex-1 overflow-y-auto">
+        
+        {/* Title aligned top-left beside Sidebar */}
+        <div className="px-6 pt-4 pb-2">
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
             Verztec's AI Assistant
           </h1>
         </div>
-      </div>
-      <div className="flex flex-col flex-1 max-w-3xl mx-auto px-4">
-        <header className="sticky top-0 shrink-0 z-20 bg-inherit">
-          <div className="flex justify-between items-center pt-4 pb-2">
-            <div>
-              {/* Replace title with ModelSelector */}
+
+        {/* Chat area container*/}
+        <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6">
+          <div className="w-full max-w-5xl flex flex-col">
+            
+            {/* Header with ModelSelector and ProfileDropdown */}
+            <header className="flex justify-between items-center mb-4 sticky top-0 bg-inherit z-20">
               <ModelSelector selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
-            </div>
-            <ProfileDropdown
-              selectedProfile={selectedProfile}
-              setSelectedProfile={setSelectedProfile}
-              theme={isDarkMode ? 'dark' : 'light'}
-              toggleTheme={toggleTheme}
-              onLogout={handleLogout}
-            />
+              <ProfileDropdown
+                selectedProfile={selectedProfile}
+                setSelectedProfile={setSelectedProfile}
+                theme={isDarkMode ? 'dark' : 'light'}
+                toggleTheme={toggleTheme}
+                onLogout={handleLogout}
+              />
+            </header>
+
+            {/* Chatbot */}
+            <Chatbot selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
           </div>
-        </header>
-        <Chatbot selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+        </div>
       </div>
+
+      {/* Search Popup */}
       <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>
   );
