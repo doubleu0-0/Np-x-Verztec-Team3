@@ -1,14 +1,24 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useImmer } from 'use-immer';
 import ChatMessages from '@/components/ChatMessages';
 import ChatInput from '@/components/ChatInput';
+import logo from '@/assets/images/logo.svg';
+import ModelSelector from '@/components/ModelSelector';
 
 function Chatbot() {
   const [messages, setMessages] = useImmer([]); // Stores chat messages
   const [newMessage, setNewMessage] = useState(''); // Stores the current input message
   const [status, setStatus] = useState(''); // Which phase the bot is in (Searching database, preprocessing, etc)
+  const [selectedModel, setSelectedModel] = useState('llama3.2:latest');
+  const messagesEndRef = useRef(null); // Just for auto scrolling
 
   const isLoading = messages.length && messages[messages.length - 1].loading;
+
+  // Auto scrolling
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
 
   async function submitNewMessage() {
     const trimmedMessage = newMessage.trim();
@@ -18,7 +28,7 @@ function Chatbot() {
       draft.push({ role: 'user', content: trimmedMessage });
     });
 
-    setStatus("🤖 Thinking...");
+    setStatus(selectedModel);
     setNewMessage('');
 
     try {
@@ -26,11 +36,10 @@ function Chatbot() {
       const res = await fetch('http://localhost:8000/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmedMessage }),
+        body: JSON.stringify({ message: trimmedMessage, model: selectedModel }),
       });
 
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-
       const data = await res.json();
       const parsedQuestions = data.questions || [];
 
@@ -72,7 +81,7 @@ function Chatbot() {
       const res = await fetch('http://localhost:8000/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: questionText }),
+        body: JSON.stringify({ message: questionText, model: selectedModel }),
       });
 
       if (!res.ok) throw new Error(`Stream error: ${res.status}`);
@@ -120,18 +129,55 @@ function Chatbot() {
   }
 
   return (
-    <div className='relative grow flex flex-col gap-6 pt-6'>
-      <ChatMessages
-        messages={messages}
-        isLoading={isLoading}
-      />
+    <div className="relative flex flex-col flex-1 min-h-0">
+      {/* Header Bar */}
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-white sticky top-0 z-30">
+        {/* Left: Model selector */}
+        <ModelSelector selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+        {/* Right: Account info */}
+        <div className="flex items-center">
+          <span className="text-sm text-gray-600 mr-2">user@verztec.com</span>
+          <img
+            src="https://ui-avatars.com/api/?name=User"
+            alt="avatar"
+            className="w-8 h-8 rounded-full border"
+          />
+        </div>
+      </div>
+
+      {/* Chat Area */}
+      <div className="flex-1 overflow-y-auto px-4 pt-6">
+        {messages.length === 0 ? (
+          <>
+            {/* Centered Verztec logo and title */}
+            <div className="flex flex-col items-center mb-6">
+              <img src={logo} className="w-32 mb-2" alt="logo" />
+              <h1 className="font-urbanist text-2xl font-semibold text-gray-800 text-center">
+                Verztec's AI Assistant
+              </h1>
+            </div>
+            <div className="font-urbanist text-primary-blue text-xl font-light space-y-2 text-center">
+              <p>👋 Hi there!</p>
+              <p>
+                I’m your AI assistant here at Verztec, think of me as your go-to guide for all things work and HR. From office policies to pantry rules, I’m here 24/7 to help you navigate your workday with ease.
+              </p>
+              <p>Whenever you’re ready, I’m here to help.</p>
+            </div>
+          </>
+        ) : (
+          <ChatMessages messages={messages} isLoading={isLoading} />
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
       <ChatInput
         newMessage={newMessage}
         isLoading={isLoading}
         setNewMessage={setNewMessage}
         submitNewMessage={submitNewMessage}
       />
-      <div className="text-sm text-gray-500 px-4">{status}</div>
+
+      <div className="text-sm text-gray-500 px-4 py-2">{status}</div>
     </div>
   );
 }

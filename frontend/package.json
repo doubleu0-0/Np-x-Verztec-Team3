@@ -26,6 +26,7 @@
     "react-markdown": "^9.0.1",
     "react-tooltip": "^5.28.1",
     "tailwind-scrollbar": "^3.1.0",
+    "tech-trends-chatbot-frontend": "file:",
     "three": "^0.176.0",
     "use-immer": "^0.10.0"
   },

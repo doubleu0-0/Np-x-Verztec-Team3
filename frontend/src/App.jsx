@@ -36,10 +36,11 @@ function App() {
 
   // Main app layout AFTER login (no background image)
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex h-screen bg-white overflow-hidden">
       <Sidebar onNewChat={handleNewChat} onSearch={handleSearch} />
 
-      <div className="flex flex-col flex-1 max-w-3xl mx-auto px-4">
+      <div className="flex flex-col flex-1 overflow-y-auto">
+      <div className="max-w-3xl w-full mx-auto px-4">{/*
         <header className="sticky top-0 shrink-0 z-20 bg-white">
           <div className="flex flex-col h-full w-full gap-1 pt-4 pb-2">
             <a href="https://www.verztec.com">
@@ -48,9 +49,10 @@ function App() {
             <h1 className="font-urbanist text-[1.65rem] font-semibold">Verztec's AI Assistant</h1>
           </div>
         </header>
-
+      */}
         <Chatbot />
       </div>
+    </div>
 
       <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>

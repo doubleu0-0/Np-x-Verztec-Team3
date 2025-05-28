@@ -22,7 +22,17 @@ function ChatMessages({ messages, isLoading }) {
             <div className='markdown-container'>
               {(loading && !content) ? <Spinner />
                 : (role === 'assistant')
-                  ? <Markdown>{content}</Markdown>
+                  ? (
+                    <Markdown
+                      components={{
+                        a: (props) => (
+                          <a {...props} target="_blank" rel="noopener noreferrer" />
+                        ),
+                      }}
+                    >
+                      {content}
+                    </Markdown>
+                  )
                   : <div className='whitespace-pre-line'>{content}</div>
               }
             </div>
