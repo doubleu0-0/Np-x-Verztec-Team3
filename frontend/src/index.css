@@ -33,6 +33,10 @@
   ::-webkit-scrollbar-thumb {
     @apply bg-primary-blue/50 border border-white rounded;
   }
+
+  body.dark {
+    @apply bg-gray-900 text-white;
+  }
 }
 
 @layer components {
