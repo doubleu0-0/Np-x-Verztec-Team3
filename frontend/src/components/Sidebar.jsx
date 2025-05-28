@@ -27,7 +27,7 @@ const Sidebar = ({ onNewChat, onSearch }) => {
     "Lorem Ipsum"];
 
   const ChatEntry = ({ title, index }) => (
-    <div className="relative group flex items-center justify-between hover:bg-gray-800 dark:hover:bg-gray-700 p-2 rounded cursor-pointer">
+    <div className="relative group flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded cursor-pointer">
       <div className="relative flex-1 overflow-hidden">
         <div
           className="pr-2 whitespace-nowrap max-w-full"
@@ -42,7 +42,7 @@ const Sidebar = ({ onNewChat, onSearch }) => {
 
       <div className="relative">
         <button
-          className="p-1 rounded-full hover:bg-gray-600"
+          className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
           onClick={(e) => {
             e.stopPropagation();
             setActiveDropdown(activeDropdown === index ? null : index);
@@ -52,7 +52,7 @@ const Sidebar = ({ onNewChat, onSearch }) => {
         </button>
         {activeDropdown === index && (
           <div className="absolute right-0 mt-1 w-28 bg-white dark:bg-gray-800 rounded-lg shadow z-10">
-            <button className="w-full text-left px-4 py-2 text-gray-900 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm rounded-t-md">
+            <button className="w-full text-left px-4 py-2 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 text-sm rounded-t-md">
               Rename
             </button>
             <button className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 text-sm rounded-b-md">
@@ -70,35 +70,34 @@ const Sidebar = ({ onNewChat, onSearch }) => {
         width: collapsed ? 64 : 260,
         transition: { duration: 0.2 }
       }}
-      className="h-screen bg-gray-900 dark:bg-gray-950 text-white p-4 flex flex-col overflow-hidden"
+      className="h-screen bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white p-4 flex flex-col overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <button onClick={() => setCollapsed(!collapsed)} className="text-2xl">
-          <FiMenu />
+        <button onClick={() => setCollapsed(!collapsed)} className="text-2xl p-1">
+          <FiMenu size={24} />
         </button>
-        {/* Theme toggle removed from here as requested */}
       </div>
 
       {/* New Chat / Search */}
       <motion.div
-        animate={{ opacity: collapsed ? 0 : 1, scale: collapsed ? 0.8 : 1 }}
+        animate={{ opacity: collapsed ? 0 : 1 }}
         transition={{ duration: 0.2 }}
         className={`${collapsed ? "pointer-events-none h-0" : "mb-4 space-y-2"}`}
       >
         <button
           onClick={onNewChat}
-          className="flex items-center space-x-2 hover:bg-gray-800 dark:hover:bg-gray-700 p-2 rounded w-full"
+          className="flex items-center space-x-2 hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded w-full"
         >
-          <FiMessageCircle />
+          <FiMessageCircle size={20} />
           <span>New Chat</span>
         </button>
 
         <button
           onClick={onSearch}
-          className="flex items-center space-x-2 hover:bg-gray-800 dark:hover:bg-gray-700 p-2 rounded w-full"
+          className="flex items-center space-x-2 hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded w-full"
         >
-          <FiSearch />
+          <FiSearch size={20} />
           <span>Search</span>
         </button>
       </motion.div>
@@ -108,7 +107,7 @@ const Sidebar = ({ onNewChat, onSearch }) => {
         <div className="flex flex-col items-center space-y-4">
           <button
             onClick={onNewChat}
-            className="p-2 rounded-full hover:bg-gray-700"
+            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
             title="New Chat"
           >
             <FiMessageCircle size={20} />
@@ -120,14 +119,14 @@ const Sidebar = ({ onNewChat, onSearch }) => {
       <div className="mt-4 flex-1 overflow-y-auto pr-1 custom-scrollbar">
         {!collapsed && (
           <>
-            <p className="text-sm text-gray-400 mb-2">Today</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Today</p>
             <div className="space-y-2 mb-4">
               {chatsToday.map((title, index) => (
                 <ChatEntry key={index} title={title} index={`today-${index}`} />
               ))}
             </div>
 
-            <p className="text-sm text-gray-400 mb-2">Yesterday</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Yesterday</p>
             <div className="space-y-2">
               {chatsYesterday.map((title, index) => (
                 <ChatEntry key={index} title={title} index={`yest-${index}`} />

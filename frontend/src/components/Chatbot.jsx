@@ -28,8 +28,8 @@ function Chatbot() {
       draft.push({ role: 'user', content: trimmedMessage });
     });
 
-    setStatus(selectedModel);
     setNewMessage('');
+    setStatus("Processing your message...");
 
     try {
       // Step 1: Process the full message to extract questions
@@ -130,20 +130,6 @@ function Chatbot() {
 
   return (
     <div className="relative flex flex-col flex-1 min-h-0">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-white sticky top-0 z-30">
-        {/* Left: Model selector */}
-        <ModelSelector selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
-        {/* Right: Account info */}
-        <div className="flex items-center">
-          <span className="text-sm text-gray-600 mr-2">user@verztec.com</span>
-          <img
-            src="https://ui-avatars.com/api/?name=User"
-            alt="avatar"
-            className="w-8 h-8 rounded-full border"
-          />
-        </div>
-      </div>
 
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto px-4 pt-6">

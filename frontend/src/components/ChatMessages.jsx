@@ -3,14 +3,27 @@ import useAutoScroll from '@/hooks/useAutoScroll';
 import Spinner from '@/components/Spinner';
 import userIcon from '@/assets/images/user.svg';
 import errorIcon from '@/assets/images/error.svg';
+import { useEffect, useRef } from 'react';
 
 function ChatMessages({ messages, isLoading }) {
-  const scrollContentRef = useAutoScroll(isLoading);
-  
+  const bottomRef = useRef(null);
+  useEffect(() => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
   return (
-    <div ref={scrollContentRef} className='grow space-y-4'>
+    <div className='grow overflow-y-auto space-y-4 p-4'>
       {messages.map(({ role, content, loading, error }, idx) => (
-        <div key={idx} className={`flex items-start gap-4 py-4 px-3 rounded-xl ${role === 'user' ? 'bg-primary-blue/10' : ''}`}>
+        <div
+          key={idx}
+          className={`flex items-start gap-4 py-4 px-3 rounded-xl ${
+            role === 'user'
+              ? 'bg-primary-blue/10 dark:bg-gray-700'
+              : 'bg-gray-100 dark:bg-gray-800'
+          }`}
+        >
           {role === 'user' && (
             <img
               className='h-[26px] w-[26px] shrink-0'
@@ -22,17 +35,7 @@ function ChatMessages({ messages, isLoading }) {
             <div className='markdown-container'>
               {(loading && !content) ? <Spinner />
                 : (role === 'assistant')
-                  ? (
-                    <Markdown
-                      components={{
-                        a: (props) => (
-                          <a {...props} target="_blank" rel="noopener noreferrer" />
-                        ),
-                      }}
-                    >
-                      {content}
-                    </Markdown>
-                  )
+                  ? <Markdown>{content}</Markdown>
                   : <div className='whitespace-pre-line'>{content}</div>
               }
             </div>
@@ -45,6 +48,7 @@ function ChatMessages({ messages, isLoading }) {
           </div>
         </div>
       ))}
+      <div ref={bottomRef} />
     </div>
   );
 }
