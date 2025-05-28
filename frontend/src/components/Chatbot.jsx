@@ -120,18 +120,25 @@ function Chatbot() {
   }
 
   return (
-    <div className='relative grow flex flex-col gap-6 pt-6'>
-      <ChatMessages
-        messages={messages}
-        isLoading={isLoading}
-      />
+    <div className="relative flex flex-col flex-1 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 pt-6">
+        {messages.length === 0 ? (
+          <div className="font-urbanist text-primary-blue dark:text-primary-blue/80 text-xl font-light space-y-2">
+            <p>👋 Hi there!</p>
+            <p>I’m your AI assistant here at Verztec, think of me as your go-to guide for all things work and HR. From office policies to pantry rules, I’m here 24/7 to help you navigate your workday with ease.</p>
+            <p>Whenever you’re ready, I’m here to help.</p>
+          </div>
+        ) : (
+          <ChatMessages messages={messages} isLoading={isLoading} />
+        )}
+      </div>
       <ChatInput
         newMessage={newMessage}
         isLoading={isLoading}
         setNewMessage={setNewMessage}
         submitNewMessage={submitNewMessage}
       />
-      <div className="text-sm text-gray-500 px-4">{status}</div>
+      <div className="text-sm text-gray-500 px-4 py-2">{status}</div>
     </div>
   );
 }
