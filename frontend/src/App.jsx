@@ -8,6 +8,7 @@ import ModelSelector from '@/components/ModelSelector';
 import UploadXlsxButton from '@/components/UploadXlsxButton';
 import UploadFile from '@/components/UploadFile';
 import logo from '@/assets/images/logo.svg';
+import white_logo from '@/assets/images/logo-white.png';
 import ReactMarkdown from 'react-markdown';
 
 function App() {
@@ -72,7 +73,7 @@ function App() {
       <div className="flex flex-col flex-1 overflow-y-auto">
         {/* Title aligned top-left beside Sidebar */}
         <div className="px-6 pt-4 pb-2 flex items-center gap-4">
-          <img src={logo} className="w-32" alt="logo" />
+          <img src={isDarkMode ? white_logo : logo} className="w-32" alt="logo" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
             Verztec's AI Assistant
           </h1>

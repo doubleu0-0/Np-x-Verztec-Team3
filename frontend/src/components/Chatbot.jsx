@@ -3,6 +3,7 @@ import { useImmer } from 'use-immer';
 import ChatMessages from '@/components/ChatMessages';
 import ChatInput from '@/components/ChatInput';
 import logo from '@/assets/images/logo.svg';
+import white_logo from '@/assets/images/logo-white.png';
 import ModelSelector from '@/components/ModelSelector';
 
 
@@ -11,6 +12,7 @@ function Chatbot() {
   const [newMessage, setNewMessage] = useState(''); // Stores the current input message
   const [status, setStatus] = useState(''); // Which phase the bot is in (Searching database, preprocessing, etc)
   const [selectedModel, setSelectedModel] = useState('llama3.2:latest');
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const messagesEndRef = useRef(null); // Just for auto scrolling
 
   const isLoading = messages.length && messages[messages.length - 1].loading;
@@ -19,6 +21,14 @@ function Chatbot() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const checkDark = () => setIsDarkMode(document.documentElement.classList.contains('dark'));
+    checkDark();
+    const observer = new MutationObserver(checkDark);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
 
   async function submitNewMessage() {
@@ -138,7 +148,7 @@ function Chatbot() {
           <>
             {/* Centered Verztec logo and title */}
             <div className="flex flex-col items-center mb-6">
-              <img src={logo} className="w-32 mb-2" alt="logo" />
+              <img src={isDarkMode ? white_logo : logo} className="w-32 mb-2" alt="logo" />
               <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
               Verztec's AI Assistant
             </h1>
