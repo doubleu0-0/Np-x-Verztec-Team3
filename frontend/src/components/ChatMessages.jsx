@@ -7,9 +7,60 @@ import { useEffect, useRef } from 'react';
 
 function ChatMessages({ messages, isLoading }) {
   const bottomRef = useRef(null);
+
   useEffect(() => {
     if (bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  // Default Male Voice
+  // useEffect(() => {
+  //   if (!messages.length) return;
+  //   const last = messages[messages.length - 1];
+
+  //   if (last.role === 'assistant' && last.content && !last.loading) {
+  //     const utterance = new SpeechSynthesisUtterance(last.content);
+  //     utterance.lang = 'en-US';
+  //     speechSynthesis.speak(utterance);
+  //   }
+  // }, [messages]);
+
+  // Default Female Voice
+  useEffect(() => {
+    if (!messages.length) return;
+    const last = messages[messages.length - 1];
+
+    if (last.role === 'assistant' && last.content && !last.loading) {
+      const speakWithFemaleVoice = () => {
+        const voices = speechSynthesis.getVoices();
+        
+        // Try to find a female-sounding English voice
+        const femaleVoice = voices.find(
+          (v) =>
+            v.lang === 'en-US' &&
+            (v.name.toLowerCase().includes('female') ||
+            v.name.toLowerCase().includes('zira') || // Windows
+            v.name.toLowerCase().includes('samantha') || // macOS
+            v.name.toLowerCase().includes('google us english')) // Chrome
+        ) || voices.find(v => v.lang === 'en-US'); // fallback
+
+        const utterance = new SpeechSynthesisUtterance(last.content);
+        utterance.voice = femaleVoice;
+        utterance.lang = 'en-US';
+        utterance.pitch = 1;
+        utterance.rate = 1;
+        speechSynthesis.speak(utterance);
+      };
+
+      // Handle case when voices might not be ready yet
+      if (speechSynthesis.getVoices().length) {
+        speakWithFemaleVoice();
+      } else {
+        speechSynthesis.onvoiceschanged = () => {
+          speakWithFemaleVoice();
+        };
+      }
     }
   }, [messages]);
 
