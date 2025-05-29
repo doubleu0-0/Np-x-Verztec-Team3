@@ -1,0 +1,11 @@
+soundfile
+torch
+torchaudio
+transformers
+pyaudio
+webrtcvad
+rx
+halo
+wheel
+pyctcdecode
+https://github.com/kpu/kenlm/archive/master.zip
