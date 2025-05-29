@@ -1,12 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import logo from '@/assets/images/logo.svg';
 
 function SignIn({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileRef = useRef(null);
+  const renderedRef = useRef(false);
+
+  useEffect(() => {
+    // Only add the script if it doesn't exist
+    if (!document.querySelector('script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]')) {
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+
+    const interval = setInterval(() => {
+      if (
+        window.turnstile &&
+        turnstileRef.current &&
+        !turnstileRef.current.hasChildNodes() &&
+        !renderedRef.current
+      ) {
+        window.turnstile.render(turnstileRef.current, {
+          sitekey: '0x4AAAAAABe10AFfumdwJJDS',
+          callback: (token) => setTurnstileToken(token),
+          theme: 'light'
+        });
+        renderedRef.current = true;
+        clearInterval(interval);
+      }
+    }, 200);
+
+    // CLEANUP: Remove any widgets on unmount
+    return () => {
+      clearInterval(interval);
+      if (turnstileRef.current) {
+        turnstileRef.current.innerHTML = '';
+        renderedRef.current = false;
+      }
+    };
+  }, []);
 
   const handleSignIn = async (e) => {
     e.preventDefault();
+
+    if (!turnstileToken) {
+      alert('Please complete the CAPTCHA.');
+      return;
+    }
 
     try {
       const response = await fetch('http://localhost:8000/login', {
@@ -14,7 +58,7 @@ function SignIn({ onLogin }) {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, turnstile_token: turnstileToken })
       });
 
       if (!response.ok) {
@@ -75,6 +119,8 @@ function SignIn({ onLogin }) {
             className="border border-gray-300 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
             required
           />
+          {/* Turnstile Widget */}
+          <div ref={turnstileRef} className="flex justify-center" />
           <button
             type="submit"
             className="w-full bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition duration-150"

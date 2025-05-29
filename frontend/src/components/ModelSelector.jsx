@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 
 function ModelSelector({ selectedModel, setSelectedModel }) {
   const models = [
-    { name: "llama3.2:latest", label: "Llama 3 Large" },
-    { name: "llama3.2:1b", label: "Llama 3 Mini" }
+    { name: "llama3.3", label: "lunar ai 4" },
+    { name: "llama3.2:latest", label: "lunar ai 3 large" },
+    { name: "llama3.2:1b", label: "lunar ai 3 mini" },
   ];
 
   return (

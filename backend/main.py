@@ -54,7 +54,7 @@ Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
 embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
 
 # Instantiate the Ollama LLM
-llm = Ollama(model="llama3.2:latest", request_timeout=120.0, temperature=0, context_window=4096)
+llm = Ollama(model="llama3.2:latest", request_timeout=120.0, temperature=0, context_window=4096, base_url="http://localhost:11500")
 Settings.llm = llm
 
 # FAISS index loading
@@ -80,7 +80,8 @@ else:
 
 light_llm = Ollama(
     model="llama3.2:1b",
-    context_window=1024
+    context_window=1024,
+    base_url="http://localhost:11500"
 )
 
 
@@ -117,15 +118,19 @@ class UserMessage(BaseModel):
     model: str = "llama3.2:latest"  # default model
 
 def get_llm(model_name: str):
+    remote_base_url = "http://localhost:11500"  # Ollama server URL
     if model_name == "llama3.2:1b":
-        return Ollama(model="llama3.2:1b", context_window=1024)
+        return Ollama(model="llama3.2:1b", context_window=1024, base_url=remote_base_url)
     elif model_name == "llama3.2:latest":
-        return Ollama(model="llama3.2:latest", request_timeout=120.0, context_window=4096)
+        return Ollama(model="llama3.2:latest", request_timeout=120.0, context_window=4096, base_url=remote_base_url)
+    elif model_name == "llama3.3":
+        return Ollama(model="llama3.3", request_timeout=120.0, context_window=4096, base_url=remote_base_url)
 
 # Call LLM and parse output
 def extract_questions(user_input: str) -> list[str]:
     prompt = prompt_template.format(user_input=user_input)
-    response = llm.complete(prompt)
+    llm_model = get_llm(model_name="llama3.2:latest")  # Default to latest model
+    response = llm_model.complete(prompt)
     raw_text = response.text.strip()
     print(f"[LLM] Raw response: {raw_text}")
     # If no HR-related content detected
@@ -189,7 +194,7 @@ async def process_message(data: UserMessage):
 @app.post("/stream")
 async def stream_answer(data: UserMessage):
     user_prompt = data.message
-    llm_model = llm
+    llm_model = get_llm(model_name=data.model)
     print(f"[STREAM] Querying with: {data.message}")
     query_engine = index.as_query_engine(similarity_top_k=5, streaming = True, llm=llm_model)
     response = query_engine.query(data.message)
@@ -267,20 +272,14 @@ def download_file(filename: str):
     return FileResponse(path)
 
 
-@app.post("/generate")
-def generate(data: UserMessage):
-    prompt = data.message
-    response = ollama.chat(model="llama3.2", messages=[{"role": "user", "content": prompt}])
-    return {"response": response["message"]["content"]}
-
-
 @app.get("/models")
 def get_models():
     # List your available models here
     return {
         "models": [
-            {"name": "llama3.2:latest", "label": "Llama 3 Large"},
-            {"name": "llama3.2:1b", "label": "Llama 3 Mini"},
+            {"name": "llama3.3", "label": "lunar ai 4"},
+            {"name": "llama3.2:latest", "label": "lunar ai 3 large"},
+            {"name": "llama3.2:1b", "label": "lunar ai 3 mini"},
         ]
     }
 
