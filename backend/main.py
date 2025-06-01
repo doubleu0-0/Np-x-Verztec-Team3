@@ -19,6 +19,7 @@ from openpyxl import load_workbook
 
 # === LLMs & Vector Store ===
 import ollama
+from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core import Settings, VectorStoreIndex, StorageContext, load_index_from_storage
@@ -52,10 +53,13 @@ app.add_middleware(
 # Set up Ollama and HuggingFace embedding
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
 embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
+remote_base_url = "http://localhost:11434"
 
 # Instantiate the Ollama LLM
-llm = Ollama(model="llama3.2:latest", request_timeout=120.0, temperature=0, context_window=4096, base_url="http://localhost:11500")
+llm = Ollama(model="llama3.2:latest", request_timeout=120.0, temperature=0, context_window=4096, base_url=remote_base_url)
 Settings.llm = llm
+memory = ChatMemoryBuffer.from_defaults(token_limit=3000)
+
 
 # FAISS index loading
 persist_dir = os.path.join(PROJECT_ROOT, "pipeline", "data", "Embedded")
@@ -81,9 +85,8 @@ else:
 light_llm = Ollama(
     model="llama3.2:1b",
     context_window=1024,
-    base_url="http://localhost:11500"
+    base_url=remote_base_url
 )
-
 
 # Prompt template
 prompt_template = """
@@ -118,13 +121,12 @@ class UserMessage(BaseModel):
     model: str = "llama3.2:latest"  # default model
 
 def get_llm(model_name: str):
-    remote_base_url = "http://localhost:11500"  # Ollama server URL
     if model_name == "llama3.2:1b":
-        return Ollama(model="llama3.2:1b", context_window=1024, base_url=remote_base_url)
+        return Ollama(model="llama3.2:1b", context_window=2048, base_url=remote_base_url)
     elif model_name == "llama3.2:latest":
-        return Ollama(model="llama3.2:latest", request_timeout=120.0, context_window=4096, base_url=remote_base_url)
+        return Ollama(model="llama3.2:latest", request_timeout=120.0, context_window=8192, base_url=remote_base_url)
     elif model_name == "llama3.3":
-        return Ollama(model="llama3.3", request_timeout=120.0, context_window=4096, base_url=remote_base_url)
+        return Ollama(model="llama3.3", request_timeout=120.0, context_window=8192, base_url=remote_base_url)
 
 # Call LLM and parse output
 def extract_questions(user_input: str) -> list[str]:
@@ -165,9 +167,15 @@ async def process_message(data: UserMessage):
         If it's unclear, gently suggest asking about HR topics like leave, benefits, claims, WFH, or company policies.
         Keep your reply friendly and human-like.
         """
-        fallback = llm_model.complete(fallback_prompt).text.strip()
-        response_text = fallback
-        result = {"questions": [], "fallback": fallback}
+        chat_engine = index.as_chat_engine(
+            chat_mode="context",
+            memory=memory,
+            system_prompt=(fallback_prompt),
+            llm=llm_model
+        )
+        fallback_response = chat_engine.chat(data.message)
+        response_text = fallback_response.response
+        result = {"questions": [], "fallback": fallback_response.response}
     else:
         response_text = "\n".join(questions)
         result = {"questions": questions}
@@ -196,8 +204,18 @@ async def stream_answer(data: UserMessage):
     user_prompt = data.message
     llm_model = get_llm(model_name=data.model)
     print(f"[STREAM] Querying with: {data.message}")
-    query_engine = index.as_query_engine(similarity_top_k=5, streaming = True, llm=llm_model)
-    response = query_engine.query(data.message)
+    chat_engine = index.as_chat_engine(
+            chat_mode="context",
+            memory=memory,
+            system_prompt=f"""
+            You are Verztec's AI HR assistant.
+            You have access to the full conversation history and should use it to answer follow-up questions.
+            You are able to provide information about HR policies, leave, benefits, claims, WFH, or company policies.
+            Answer all questions in a friendly and human-like manner.
+            """,
+            llm=llm_model
+        )
+    response = chat_engine.stream_chat(data.message)
 
     # This buffer will store the full response for logging
     full_response = []
@@ -480,6 +498,6 @@ async def upload_file(file: UploadFile = File(...)):
 # Serve React frontend
 app.mount(
     "/",
-    StaticFiles(directory=r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\front_end\frontend\dist", html=True),
+    StaticFiles(directory=r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\GPU\frontend\dist", html=True),
     name="static"
 )

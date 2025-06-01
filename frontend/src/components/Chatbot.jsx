@@ -107,8 +107,6 @@ function Chatbot() {
 
         const chunk = decoder.decode(value, { stream: true });
 
-        setStatus(chunk);
-
         setMessages(draft => {
           if (!draft[assistantIndex]) {
             console.warn("Invalid assistant index:", assistantIndex);

@@ -10,6 +10,7 @@ import UploadFile from '@/components/UploadFile';
 import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
 import ReactMarkdown from 'react-markdown';
+import FloatingWindow from "@/components/FloatingWindow";
 
 function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -83,7 +84,7 @@ function App() {
         <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6">
           <div className="w-full max-w-5xl flex flex-col">
             {/* Header with ModelSelector, View Buttons, and ProfileDropdown */}
-            <header className="flex justify-between items-center mb-4 sticky top-0 bg-inherit z-20">
+            <header className="flex justify-between items-center mb-1 sticky top-0 bg-inherit z-20">
               <div className="flex items-center gap-4">
                 <ModelSelector selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
                 <div className="flex gap-2">
@@ -147,6 +148,8 @@ function App() {
 
       {/* Search Popup */}
       <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
+      <FloatingWindow />
     </div>
   );
 }

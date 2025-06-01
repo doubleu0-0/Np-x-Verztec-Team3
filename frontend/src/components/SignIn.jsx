@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import logo from '@/assets/images/logo.svg';
+import background from '@/assets/images/background.png'; // Import your background image
 
 function SignIn({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -89,8 +90,16 @@ function SignIn({ onLogin }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-900/70 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-8 w-[90%] max-w-md shadow-2xl space-y-6">
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50"
+      style={{
+        backgroundImage: `url(${background})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      <div className="bg-white rounded-2xl p-8 w-[90%] max-w-md shadow-2xl space-y-6 bg-opacity-95">
         {/* Logo */}
         <div className="flex justify-center">
           <img src={logo} alt="Verztec Logo" className="h-12 object-contain" />
