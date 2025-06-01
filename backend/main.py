@@ -53,7 +53,7 @@ app.add_middleware(
 # Set up Ollama and HuggingFace embedding
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
 embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
-remote_base_url = "http://localhost:11434"
+remote_base_url = "http://localhost:11500"
 
 # Instantiate the Ollama LLM
 llm = Ollama(model="llama3.2:latest", request_timeout=120.0, temperature=0, context_window=4096, base_url=remote_base_url)
@@ -159,14 +159,20 @@ async def process_message(data: UserMessage):
     if not questions:
         print("[INFO] No HR-related questions found. Generating fallback...")
         fallback_prompt = f"""
-        The user said:
+            The user said:
 
-        "{data.message}"
+            "{data.message}"
 
-        If it's not an HR question, feel free to respond naturally and politely — even if it's something casual or personal like "I love you".
-        If it's unclear, gently suggest asking about HR topics like leave, benefits, claims, WFH, or company policies.
-        Keep your reply friendly and human-like.
-        """
+            If the message isn't about HR (like leave, claims, benefits, or work policies), respond naturally
+            and warmly — as if you're a friendly, empathetic colleague. 
+            If the user says something sweet, casual, or emotional (like "I love you", "thank you", or "you're the best"), 
+            feel free to respond in kind — e.g., "Awww, thank you!", "You're so kind!", or "That means a lot 🥹".
+
+            If you're unsure what they meant, gently guide them toward HR-related topics like leave, WFH, or company policy — 
+            but still sound friendly and non-robotic.
+
+            Your reply should feel human, light-hearted, and understanding.
+"""
         chat_engine = index.as_chat_engine(
             chat_mode="context",
             memory=memory,
@@ -211,7 +217,8 @@ async def stream_answer(data: UserMessage):
             You are Verztec's AI HR assistant.
             You have access to the full conversation history and should use it to answer follow-up questions.
             You are able to provide information about HR policies, leave, benefits, claims, WFH, or company policies.
-            Answer all questions in a friendly and human-like manner.
+            Answer all questions in a friendly and human-like manner. If you are not confident about the answer,
+            you should tell the user that you are not sure and suggest they contact HR directly.
             """,
             llm=llm_model
         )
@@ -498,6 +505,6 @@ async def upload_file(file: UploadFile = File(...)):
 # Serve React frontend
 app.mount(
     "/",
-    StaticFiles(directory=r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\GPU\frontend\dist", html=True),
+    StaticFiles(directory=r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\Presentation\frontend\dist", html=True),
     name="static"
 )
