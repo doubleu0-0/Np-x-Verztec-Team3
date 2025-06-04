@@ -35,10 +35,11 @@ import faiss
 import io
 import os
 import shutil 
+from pathlib import Path
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-UPLOAD_DIR = os.path.join(PROJECT_ROOT, "pipeline", "data", "raw_data")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+UPLOAD_DIR = PROJECT_ROOT / "pipeline" / "data" / "raw_data"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI()
 
@@ -53,23 +54,23 @@ app.add_middleware(
 # Set up Ollama and HuggingFace embedding
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
 embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
-remote_base_url = "http://localhost:11500"
+remote_base_url = "http://localhost:11434"
 
 # Instantiate the Ollama LLM
 llm = Ollama(model="llama3.2:latest", request_timeout=120.0, temperature=0, context_window=4096, base_url=remote_base_url)
 Settings.llm = llm
-memory = ChatMemoryBuffer.from_defaults(token_limit=3000)
+memory = ChatMemoryBuffer.from_defaults(token_limit=1024)
 
 
 # FAISS index loading
-persist_dir = os.path.join(PROJECT_ROOT, "pipeline", "data", "Embedded")
+persist_dir = PROJECT_ROOT / "pipeline" / "data" / "Embedded"
 faiss_path = "faiss.index"
-faiss_index_path = os.path.join(persist_dir, faiss_path)
+faiss_index_path = persist_dir / faiss_path
 
-if os.path.exists(faiss_index_path):
-    faiss_index = faiss.read_index(faiss_index_path)
+if faiss_index_path.exists():
+    faiss_index = faiss.read_index(str(faiss_index_path))
     vector_store = FaissVectorStore(faiss_index=faiss_index)
-    storage_context = StorageContext.from_defaults(persist_dir=persist_dir, vector_store=vector_store)
+    storage_context = StorageContext.from_defaults(persist_dir=str(persist_dir), vector_store=vector_store)
     index = load_index_from_storage(storage_context)
     query_engine = index.as_query_engine(similarity_top_k=5, streaming=True)
 else:
@@ -124,9 +125,9 @@ def get_llm(model_name: str):
     if model_name == "llama3.2:1b":
         return Ollama(model="llama3.2:1b", context_window=2048, base_url=remote_base_url)
     elif model_name == "llama3.2:latest":
-        return Ollama(model="llama3.2:latest", request_timeout=120.0, context_window=8192, base_url=remote_base_url)
+        return Ollama(model="llama3.2:latest", request_timeout=120.0, context_window=4096, base_url=remote_base_url)
     elif model_name == "llama3.3":
-        return Ollama(model="llama3.3", request_timeout=120.0, context_window=8192, base_url=remote_base_url)
+        return Ollama(model="llama3.3", request_timeout=120.0, context_window=4096, base_url=remote_base_url)
 
 # Call LLM and parse output
 def extract_questions(user_input: str) -> list[str]:
@@ -233,13 +234,12 @@ async def stream_answer(data: UserMessage):
             yield token
 
         def get_real_file(filename):
-            base = os.path.splitext(filename)[0]
+            base = Path(filename).with_suffix('')
             for ext in [".pdf", ".docx", ".doc"]:
-                real_path = base + ext
-                # Use the correct upload directory
-                file_path = os.path.join(UPLOAD_DIR, real_path)
-                if os.path.exists(file_path):
-                    return real_path
+                real_path = base.with_suffix(ext)
+                file_path = UPLOAD_DIR / real_path.name
+                if file_path.exists():
+                    return real_path.name
             return filename  # fallback
 
         # Generate citations (Only show the unqiue files of the top 3 nodes)
@@ -293,8 +293,8 @@ async def stream_answer(data: UserMessage):
 # Download files
 @app.get("/download/{filename}")
 def download_file(filename: str):
-    path = os.path.join(PROJECT_ROOT, "pipeline", "data", "raw_data", filename)
-    return FileResponse(path)
+    path = UPLOAD_DIR / filename
+    return FileResponse(str(path))
 
 
 @app.get("/models")
@@ -495,7 +495,7 @@ async def upload_xlsx(file: UploadFile = File(...)):
     
 @app.post("/upload-file")
 async def upload_file(file: UploadFile = File(...)):
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    file_path = UPLOAD_DIR / file.filename
     print(f"Saving file to: {file_path}")
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)

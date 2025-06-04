@@ -20,7 +20,6 @@ See the LICENSE file in the project root for full license information.
 """
 
 import io
-import os
 import json
 import unicodedata
 import xlrd
@@ -35,6 +34,7 @@ import pandas as pd
 import faiss
 import sys
 import win32com.client
+from pathlib import Path
 from operator import itemgetter
 from llama_index.core.schema import Document as llamadoc
 from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage
@@ -48,11 +48,12 @@ from llama_index.core.storage.index_store import SimpleIndexStore
 from llama_index.core.storage.kvstore.simple_kvstore import SimpleKVStore
 from bs4 import BeautifulSoup, Tag, NavigableString
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Use pathlib so it works on both Windows and Linux
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 print(f"Project root: {PROJECT_ROOT}")
-RAW_DATA = os.path.abspath(os.path.join(PROJECT_ROOT, 'data', 'raw_data'))
-LOG_FILE = os.path.abspath(os.path.join(PROJECT_ROOT, 'data', 'Logs', 'processed_files.json'))
-PERSIST_DIR = os.path.join(PROJECT_ROOT, 'data', 'Embedded')
+RAW_DATA = PROJECT_ROOT / 'data' / 'raw_data'
+LOG_FILE = PROJECT_ROOT / 'data' / 'Logs' / 'processed_files.json'
+PERSIST_DIR = PROJECT_ROOT / 'data' / 'Embedded'
 
 # This one is for embeding USER query
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2") # MUST BE SAME AS THE ONE USED FOR INDEXING
@@ -69,7 +70,7 @@ embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
 Settings.llm = Ollama(model="llama3.2", context_window=4096, timeout=120)
 
 faiss_path = "faiss.index"
-faiss_file_path = os.path.join(PERSIST_DIR, faiss_path)
+faiss_file_path = PERSIST_DIR / faiss_path
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
@@ -490,7 +491,7 @@ def extract_text_from_pptx(file_path):
             if notes_text:
                 slide_text.append(f"[Notes] {notes_text}")
 
-        all_text.append("\n".join(slide_text))
+        all_text.append("\n\n".join(slide_text))
 
     return "\n\n".join(all_text)
 
@@ -548,21 +549,22 @@ def build_or_append_index(documents, embed_model, persist_dir="pipeline/data/Emb
     Parameters:
         documents (List[Document]): New documents to insert
         embed_model (BaseEmbedding): Embedding model (e.g., HuggingFaceEmbedding)
-        persist_dir (str): Directory where LlamaIndex metadata is stored
+        persist_dir (str or Path): Directory where LlamaIndex metadata is stored
         faiss_path (str): Filename for FAISS index (within persist_dir)
         embedding_dim (int): Embedding vector size
     """
-    faiss_file_path = os.path.join(persist_dir, faiss_path)
+    persist_dir = Path(persist_dir)
+    faiss_file_path = persist_dir / faiss_path
 
-    os.makedirs(persist_dir, exist_ok=True)
+    persist_dir.mkdir(parents=True, exist_ok=True)
 
-    if os.path.exists(faiss_file_path):
+    if faiss_file_path.exists():
         # Load existing FAISS and LlamaIndex
         print("Loading existing index...")
-        faiss_index = faiss.read_index(faiss_file_path)
+        faiss_index = faiss.read_index(str(faiss_file_path))
         vector_store = FaissVectorStore(faiss_index=faiss_index)
         storage_context = StorageContext.from_defaults(
-            persist_dir=persist_dir,
+            persist_dir=str(persist_dir),
             vector_store=vector_store
         )
         index = load_index_from_storage(storage_context)
@@ -573,8 +575,8 @@ def build_or_append_index(documents, embed_model, persist_dir="pipeline/data/Emb
         index.insert_nodes(nodes)
 
         # Persist changes
-        index.storage_context.persist(persist_dir=persist_dir)
-        faiss.write_index(faiss_index, faiss_file_path)
+        index.storage_context.persist(persist_dir=str(persist_dir))
+        faiss.write_index(faiss_index, str(faiss_file_path))
 
     else:
         # Create new FAISS and LlamaIndex
@@ -601,8 +603,8 @@ def build_or_append_index(documents, embed_model, persist_dir="pipeline/data/Emb
 
     print("Saving new data...")
     print("Total docs in index:", len(index.storage_context.docstore.docs))
-    index.storage_context.persist(persist_dir=persist_dir)
-    faiss.write_index(faiss_index, faiss_file_path)
+    index.storage_context.persist(persist_dir=str(persist_dir))
+    faiss.write_index(faiss_index, str(faiss_file_path))
 
     return index
 
@@ -640,33 +642,36 @@ def extract_text_from_file(file_path):
 def run_pipeline(raw_folder):
     new_files = []
 
-    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    log_file_path = Path(LOG_FILE)
+    raw_folder = Path(raw_folder)
+
+    log_file_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Ensure log file exists and has valid JSON
-    if not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0:
-        with open(LOG_FILE, "w") as f:
+    if not log_file_path.exists() or log_file_path.stat().st_size == 0:
+        with open(log_file_path, "w") as f:
             json.dump([], f)
 
-    with open(LOG_FILE, "r") as f:
+    with open(log_file_path, "r") as f:
         processed_files = set(json.load(f))
 
-
-    for filename in os.listdir(raw_folder):
-        if filename in processed_files:
-            print(f'Skipping file: {filename}')
+    for filename in raw_folder.iterdir():
+        if not filename.is_file():
+            continue
+        if filename.name in processed_files:
+            print(f'Skipping file: {filename.name}')
             continue  # skip already processed files
 
-        print(f"\nProcessing file: {filename}")
-        file_path = os.path.join(raw_folder, filename)
-        extracted_text = extract_text_from_file(file_path)
+        print(f"\nProcessing file: {filename.name}")
+        extracted_text = extract_text_from_file(str(filename))
 
-        documents = split_into_documents(extracted_text, title=filename, source=filename)
-        build_or_append_index(documents, embed_model, persist_dir=PERSIST_DIR, faiss_path=faiss_file_path, embedding_dim=1024)
-        new_files.append(filename)
+        documents = split_into_documents(extracted_text, title=filename.name, source=filename.name)
+        build_or_append_index(documents, embed_model, persist_dir=PERSIST_DIR, faiss_path=faiss_file_path.name, embedding_dim=1024)
+        new_files.append(filename.name)
 
     # Update log file
     processed_files.update(new_files)
-    with open(LOG_FILE, "w") as f:
+    with open(log_file_path, "w") as f:
         json.dump(list(processed_files), f, indent=2)
 
     print("Pipeline completed. Database has been updated!")

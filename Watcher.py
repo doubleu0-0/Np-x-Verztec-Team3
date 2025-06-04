@@ -5,16 +5,16 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import subprocess
 import pymysql
-import os
 import logging
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
 # Automatically resolve absolute project path
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-WATCH_FOLDER = os.path.join(PROJECT_ROOT, "pipeline", "data", "raw_data")
-PIPELINE_SCRIPT = os.path.join(PROJECT_ROOT, "pipeline", "pipeline.py")
+PROJECT_ROOT = Path(__file__).resolve().parent
+WATCH_FOLDER = PROJECT_ROOT / "pipeline" / "data" / "raw_data"
+PIPELINE_SCRIPT = PROJECT_ROOT / "pipeline" / "src" / "pipeline.py"
 
 # ✅ Updated database credentials
 DB_CONFIG = {
@@ -29,9 +29,9 @@ class WatcherHandler(FileSystemEventHandler):
         if not event.is_directory:
             logging.info(f"🆕 New file created: {event.src_path}")
 
-            file_name = os.path.basename(event.src_path)
-            file_type = os.path.splitext(file_name)[1].lstrip(".").lower()
-            file_path = event.src_path
+            file_path = Path(event.src_path)
+            file_name = file_path.name
+            file_type = file_path.suffix.lstrip(".").lower()
             uploaded_by = 1  # Modify dynamically if needed
             department = "IT"
             access_level = "ALL"
@@ -42,7 +42,7 @@ class WatcherHandler(FileSystemEventHandler):
                     cursor.execute("""
                         INSERT INTO files (file_name, file_type, uploaded_by, department, access_level, file_path)
                         VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (file_name, file_type, uploaded_by, department, access_level, file_path))
+                    """, (file_name, file_type, uploaded_by, department, access_level, str(file_path)))
                     conn.commit()
                 conn.close()
                 logging.info("✅ Database entry created.")
@@ -52,7 +52,7 @@ class WatcherHandler(FileSystemEventHandler):
             try:
                 subprocess.run([
                     "python",
-                    os.path.join("pipeline", "src", "pipeline.py")
+                    str(PIPELINE_SCRIPT)
                 ])
                 logging.info("🚀 Pipeline triggered successfully.")
             except subprocess.CalledProcessError as e:
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     logging.info(f"👀 Watching folder: {WATCH_FOLDER}")
     event_handler = WatcherHandler()
     observer = Observer()
-    observer.schedule(event_handler, WATCH_FOLDER, recursive=False)
+    observer.schedule(event_handler, str(WATCH_FOLDER), recursive=False)
     observer.start()
 
     try:
