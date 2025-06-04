@@ -503,8 +503,8 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 # Serve React frontend
-app.mount(
-    "/",
-    StaticFiles(directory=r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\Presentation\frontend\dist", html=True),
-    name="static"
-)
+# app.mount(
+#     "/",
+#     StaticFiles(directory=r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\Presentation\frontend\dist", html=True),
+#     name="static"
+# )
