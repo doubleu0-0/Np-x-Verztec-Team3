@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Sidebar from '@/components/Sidebar';
 import SearchPopup from '@/components/SearchPopup';
 import Chatbot from '@/components/Chatbot';
+import ChatInput from '@/components/ChatInput';
 import SignIn from '@/components/SignIn';
 import ProfileDropdown from '@/components/ProfileDropdown';
 import ModelSelector from '@/components/ModelSelector';
@@ -12,6 +13,27 @@ import white_logo from '@/assets/images/logo-white.png';
 import ReactMarkdown from 'react-markdown';
 import FloatingWindow from "@/components/FloatingWindow";
 
+const models = [
+  {
+    name: "llama3.3",
+    label: "Lunar ai 4",
+    description: "Powerful, large model for complex challenges",
+    beta: true,
+  },
+  {
+    name: "llama3.2:latest",
+    label: "Lunar ai 3",
+    description: "Smart, efficient model for everyday use",
+    beta: false,
+  },
+  {
+    name: "llama3.2:1b",
+    label: "Lunar ai 3 mini",
+    description: "Fastest model for daily tasks",
+    beta: false,
+  },
+];
+
 function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -21,6 +43,9 @@ function App() {
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [selectedModel, setSelectedModel] = useState('llama3.2:latest');
   const [view, setView] = useState('chat');
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+
+  const modelDropdownRef = useRef(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -32,6 +57,26 @@ function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        modelDropdownRef.current &&
+        !modelDropdownRef.current.contains(event.target)
+      ) {
+        setShowModelDropdown(false);
+      }
+    }
+    if (showModelDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showModelDropdown]);
 
   const toggleTheme = () => {
     setIsDarkMode(prev => !prev);
@@ -54,6 +99,8 @@ function App() {
     setSelectedProfile(null);
   };
 
+  const currentModel = models.find(m => m.name === selectedModel);
+
   if (!isLoggedIn) {
     return (
       <div
@@ -71,22 +118,56 @@ function App() {
       <Sidebar onNewChat={handleNewChat} onSearch={handleSearch} />
 
       {/* Main Content */}
-      <div className="flex flex-col flex-1 overflow-y-auto">
+      <div className="flex flex-col flex-1 overflow-y-auto transition-all duration-300 relative">
         {/* Title aligned top-left beside Sidebar */}
-        <div className="px-6 pt-4 pb-2 flex items-center gap-4">
+        <div className="px-6 pt-2 pb-1 flex items-center gap-4">
           <img src={isDarkMode ? white_logo : logo} className="w-32" alt="logo" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
             Verztec's AI Assistant
           </h1>
         </div>
 
-        {/* Chat area container */}
-        <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6">
-          <div className="w-full max-w-5xl flex flex-col">
-            {/* Header with ModelSelector, View Buttons, and ProfileDropdown */}
-            <header className="flex justify-between items-center mb-1 sticky top-0 bg-inherit z-20">
-              <div className="flex items-center gap-4">
-                <ModelSelector selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+        {/* Header with Model Button, View Buttons (right), and ProfileDropdown */}
+        <div className="flex justify-center w-full px-4">
+          <div className="w-full max-w-5xl">
+            <header className="flex justify-between items-center mb-2 border-b border-gray-200 dark:border-gray-700 rounded-lg px-4 py-1 z-30">
+              <div className="flex items-center gap-2">
+                {/* Model Button - now left aligned */}
+                <div className="relative" ref={modelDropdownRef}>
+                  <button
+                    onClick={() => setShowModelDropdown(v => !v)}
+                    className={`flex items-center px-3 py-1 text-sm rounded border font-semibold shadow transition
+                      ${showModelDropdown ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-400'}
+                    `}
+                  >
+                    <span className="font-semibold text-gray-900 dark:text-white">{currentModel.label}</span>
+                    {currentModel.beta && (
+                      <span className="ml-2 px-2 py-0.5 text-xs font-bold rounded bg-yellow-400 text-yellow-900"
+                        style={{ fontSize: '0.7rem', marginLeft: 6 }}>
+                        Beta
+                      </span>
+                    )}
+                    <svg className="ml-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showModelDropdown && (
+                    <div className="absolute left-0 mt-4 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
+                      style={{ marginTop: '1.5rem' }} // Extra margin above dropdown
+                    >
+                      <ModelSelector
+                        selectedModel={selectedModel}
+                        setSelectedModel={(name) => {
+                          setSelectedModel(name);
+                          setShowModelDropdown(false);
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* View Buttons */}
                 <div className="flex gap-2">
                   <button
                     onClick={() => setView('chat')}
@@ -113,16 +194,22 @@ function App() {
                     Upload File
                   </button>
                 </div>
+                {/* Profile Dropdown */}
+                <ProfileDropdown
+                  selectedProfile={selectedProfile}
+                  setSelectedProfile={setSelectedProfile}
+                  theme={isDarkMode ? 'dark' : 'light'}
+                  toggleTheme={toggleTheme}
+                  onLogout={handleLogout}
+                />
               </div>
-              <ProfileDropdown
-                selectedProfile={selectedProfile}
-                setSelectedProfile={setSelectedProfile}
-                theme={isDarkMode ? 'dark' : 'light'}
-                toggleTheme={toggleTheme}
-                onLogout={handleLogout}
-              />
             </header>
+          </div>
+        </div>
 
+        {/* Chat area container */}
+        <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6 relative">
+          <div className="w-full max-w-5xl flex flex-col">
             {/* Main View */}
             <main className="flex-1">
               {view === 'chat' && <Chatbot selectedModel={selectedModel} setSelectedModel={setSelectedModel} />}
@@ -144,12 +231,12 @@ function App() {
             </main>
           </div>
         </div>
+
+        {/* Search Popup */}
+        <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
+        <FloatingWindow />
       </div>
-
-      {/* Search Popup */}
-      <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-
-      <FloatingWindow />
     </div>
   );
 }
