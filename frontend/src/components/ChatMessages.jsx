@@ -65,7 +65,8 @@ function ChatMessages({ messages, isLoading }) {
   }, [messages]);
 
   return (
-    <div className='grow overflow-y-auto space-y-4 p-4'>
+    // changed this line below
+    <div className='flex-1 overflow-y-auto min-h-0 space-y-4 p-4'>
       {messages.map(({ role, content, loading, error }, idx) => (
         <div
           key={idx}
