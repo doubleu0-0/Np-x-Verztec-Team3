@@ -67,18 +67,21 @@ function App() {
       <Sidebar onNewChat={handleNewChat} onSearch={handleSearch} />
 
       {/* Main Content */}
-      <div className="flex flex-col flex-1 overflow-y-auto">
+      {/* changed this line below */}
+      <div className="flex flex-col flex-1">
         
         {/* Title aligned top-left beside Sidebar */}
-        <div className="px-6 pt-4 pb-2">
+        {/* changed this line below */}
+        <div className="px-6 pt-4 pb-2 flex justify-between items-center">
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
-            Verztec's AI Assistant
+            Lunar AI Assistant
           </h1>
         </div>
 
         {/* Chat area container*/}
-        <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6">
-          <div className="w-full max-w-5xl flex flex-col">
+        {/* changed these 2 lines below */}
+        <div className="flex-1 overflow-y-auto px-4 pb-6 flex justify-center min-h-0">
+          <div className="w-full max-w-5xl h-full flex flex-col">
             
             {/* Header with ModelSelector and ProfileDropdown */}
             <header className="flex justify-between items-center mb-4 sticky top-0 bg-inherit z-20">
