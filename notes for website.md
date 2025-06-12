@@ -37,6 +37,7 @@
 - `cd frontend`
 - `npm install`
 - `npm install axios`
+- `npm install three@0.153.0 @react-three/fiber@8.13.6 @react-three/drei@9.53.1 --save`
 
 ### Run the App
 
