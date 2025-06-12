@@ -128,8 +128,8 @@ function App() {
         </div>
 
         {/* Header with Model Button, View Buttons (right), and ProfileDropdown */}
-        <div className="flex-1 overflow-y-auto px-4 pb-6 flex justify-center min-h-0">
-          <div className="w-full max-w-5xl h-full flex flex-col">
+        <div className="flex justify-center w-full px-4">
+          <div className="w-full max-w-5xl">
             <header className="flex justify-between items-center mb-2 border-b border-gray-200 dark:border-gray-700 rounded-lg px-4 py-1 z-30">
               <div className="flex items-center gap-2">
                 {/* Model Button - now left aligned */}
@@ -208,11 +208,13 @@ function App() {
         </div>
 
         {/* Chat area container */}
-        <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6 relative">
-          <div className="w-full max-w-5xl flex flex-col">
+        <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6 relative min-h-0">
+          <div className="w-full max-w-5xl flex flex-col flex-1 min-h-0">
             {/* Main View */}
-            <main className="flex-1">
-              {view === 'chat' && <Chatbot selectedModel={selectedModel} setSelectedModel={setSelectedModel} />}
+            <main className="flex-1 min-h-0 flex flex-col">
+              {view === 'chat' && (
+                <Chatbot selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+              )}
               {view === 'uploadXlsx' && <UploadXlsxButton />}
               {view === 'uploadFile' && <UploadFile />}
               {view === 'markdown' && (
