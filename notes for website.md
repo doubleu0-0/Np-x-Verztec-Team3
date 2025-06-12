@@ -9,6 +9,7 @@
 ### Setup
 
 - `cd backend`
+- `Get-Command python` and get the Source e.g "C:\Program Files\Python38\python.exe"
 - Create a virtual environment (powershell): & "C:\Program Files\Python38\python.exe" -m venv venv
 - Activate the virtual environment:
   - Mac/Linux: `source ./venv/bin/activate`
@@ -19,6 +20,7 @@
 ### Run the backend
 
 - `ollama pull llama3.2`
+- `ollama pull llama3.2:1b`
 - `uvicorn main:app --reload`
 
 
