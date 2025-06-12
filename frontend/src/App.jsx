@@ -118,9 +118,9 @@ function App() {
       <Sidebar onNewChat={handleNewChat} onSearch={handleSearch} />
 
       {/* Main Content */}
-      <div className="flex flex-col flex-1 overflow-y-auto transition-all duration-300 relative">
+      <div className="flex flex-col flex-1">
         {/* Title aligned top-left beside Sidebar */}
-        <div className="px-6 pt-2 pb-1 flex items-center gap-4">
+        <div className="px-6 pt-4 pb-2 flex justify-between items-center">
           <img src={isDarkMode ? white_logo : logo} className="w-32" alt="logo" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
             Verztec's AI Assistant
@@ -128,8 +128,8 @@ function App() {
         </div>
 
         {/* Header with Model Button, View Buttons (right), and ProfileDropdown */}
-        <div className="flex justify-center w-full px-4">
-          <div className="w-full max-w-5xl">
+        <div className="flex-1 overflow-y-auto px-4 pb-6 flex justify-center min-h-0">
+          <div className="w-full max-w-5xl h-full flex flex-col">
             <header className="flex justify-between items-center mb-2 border-b border-gray-200 dark:border-gray-700 rounded-lg px-4 py-1 z-30">
               <div className="flex items-center gap-2">
                 {/* Model Button - now left aligned */}
