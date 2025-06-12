@@ -16,6 +16,7 @@
   - Windows ((powershell)): `.\venv\Scripts\activate.ps1`
 - Install the dependencies from [requirements.txt](./backend/requirements.txt)
   - `pip install -r requirements.txt`
+- Edit the database credentials in Watcher.py and backend/main.py
 
 ### Run the backend
 
