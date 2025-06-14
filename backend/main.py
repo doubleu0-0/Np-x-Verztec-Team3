@@ -1,6 +1,6 @@
 # === FastAPI Core ===
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends
-from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse
+from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -29,7 +29,7 @@ from llama_index.vector_stores.faiss import FaissVectorStore
 from datetime import datetime, timedelta
 from urllib.parse import quote
 from enum import Enum
-from typing import Generator
+from typing import Generator, Optional, List
 import re
 import faiss
 import io
@@ -50,6 +50,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+class UpdateUser(BaseModel):
+    username: str
+    email: str
+    department: str
+    role: str
+    country: str
 
 # Set up Ollama and HuggingFace embedding
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
@@ -120,6 +127,7 @@ Below is the raw user message, between <user></user> tags. Only process what's i
 class UserMessage(BaseModel):
     message: str
     model: str = "llama3.2:latest"  # default model
+    conversation_id: Optional[int] = None
 
 def get_llm(model_name: str):
     if model_name == "llama3.2:1b":
@@ -150,60 +158,74 @@ def extract_questions(user_input: str) -> list[str]:
 
     return question_list
 
+def generate_title_from_prompt(user_prompt: str) -> str:
+    system_instruction = (
+        "Generate a short and relevant title (max 5 words) for the following user query. "
+        "Only return the title and nothing else. Avoid punctuation at the end."
+    )
+    full_prompt = f"{system_instruction}\n\nUser message:\n\"{user_prompt}\""
+
+    title = light_llm.complete(full_prompt).text.strip()
+
+    # Optional cleanup
+    if title.endswith("."):
+        title = title[:-1].strip()
+
+    return title
+
 # Endpoint
 @app.post("/process")
 async def process_message(data: UserMessage):
-    llm_model = get_llm(model_name=data.model)
-    questions = extract_questions(data.message)
+    try:
+        questions = extract_questions(data.message)
 
-    response_text = ""
-    if not questions:
-        print("[INFO] No HR-related questions found. Generating fallback...")
-        fallback_prompt = f"""
+        if not questions:
+            fallback_prompt = f"""
             The user said:
 
             "{data.message}"
 
-            If the message isn't about HR (like leave, claims, benefits, or work policies), respond naturally
-            and warmly — as if you're a friendly, empathetic colleague. 
-            If the user says something sweet, casual, or emotional (like "I love you", "thank you", or "you're the best"), 
-            feel free to respond in kind — e.g., "Awww, thank you!", "You're so kind!", or "That means a lot 🥹".
+            If it's not an HR question, feel free to respond naturally and politely — even if it's something casual or personal like "I love you".
+            If it's unclear, gently suggest asking about HR topics like leave, benefits, claims, WFH, or company policies.
+            Keep your reply friendly and human-like.
+            """
+            fallback = light_llm.complete(fallback_prompt).text.strip()
+            response_text = fallback
+            result = {"questions": [], "fallback": fallback}
+        else:
+            response_text = "\n".join(questions)
+            result = {"questions": questions}
 
-            If you're unsure what they meant, gently guide them toward HR-related topics like leave, WFH, or company policy — 
-            but still sound friendly and non-robotic.
-
-            Your reply should feel human, light-hearted, and understanding.
-"""
-        chat_engine = index.as_chat_engine(
-            chat_mode="context",
-            memory=memory,
-            system_prompt=(fallback_prompt),
-            llm=llm_model
-        )
-        fallback_response = chat_engine.chat(data.message)
-        response_text = fallback_response.response
-        result = {"questions": [], "fallback": fallback_response.response}
-    else:
-        response_text = "\n".join(questions)
-        result = {"questions": questions}
-
-    # Log conversation here
-    try:
+        # DB Logging
         conn = get_db()
         with conn.cursor() as cursor:
-            sql = """
-                INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
-                VALUES (%s, %s, %s, %s)
-            """
-            user_id = 1  # Replace with dynamic user id if available
-            conversation_id = "1"  # Replace as needed
+            user_id = 1
+            is_new = data.conversation_id is None or data.conversation_id == ""
 
-            cursor.execute(sql, (user_id, conversation_id, data.message, response_text))
+            if is_new:
+                sql_create_convo = "INSERT INTO conversations (user_id, title) VALUES (%s, %s)"
+                convo_title = generate_title_from_prompt(data.message)
+                cursor.execute(sql_create_convo, (user_id, convo_title))
+                conversation_id = cursor.lastrowid
+            else:
+                conversation_id = int(data.conversation_id)
+
+            sql_log = "INSERT INTO chatbot_logs (user_id, conversation_id, query, response) VALUES (%s, %s, %s, %s)"
+            cursor.execute(sql_log, (user_id, conversation_id, data.message, response_text))
+
         conn.commit()
-    finally:
-        conn.close()
+        if is_new:
+            result["conversation_id"] = conversation_id
 
-    return result
+        return result
+
+    except Exception as e:
+        print("Error:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.post("/stream")
@@ -270,20 +292,36 @@ async def stream_answer(data: UserMessage):
         for token in generator:
             buffer.write(token)
             yield token
+
         final_response = buffer.getvalue()
 
-        # Log to DB after full response is available
+        # 🔽 LOGGING SECTION BELOW
         try:
             conn = get_db()
             with conn.cursor() as cursor:
-                sql = """
+                user_id = 1  # replace with actual auth logic
+
+                # Check if this is a new conversation
+                if not data.conversation_id:
+                    conversation_title = generate_title_from_prompt(user_prompt)
+                    cursor.execute(
+                        "INSERT INTO conversations (user_id, title) VALUES (%s, %s)",
+                        (user_id, conversation_title)
+                    )
+                    conversation_id = cursor.lastrowid
+                else:
+                    conversation_id = int(data.conversation_id)
+
+                # Log chatbot message
+                cursor.execute(
+                    """
                     INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
                     VALUES (%s, %s, %s, %s)
-                """
-                user_id = 1
-                conversation_id = "1"
-                cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
-            conn.commit()
+                    """,
+                    (user_id, conversation_id, user_prompt, final_response)
+                )
+
+                conn.commit()
         finally:
             conn.close()
 
@@ -320,9 +358,59 @@ def get_db():
     return pymysql.connect(
         host="localhost",
         user="root",
-        password="Asimplepassword1!",
-        database="verztec"
+        password="Tanhongkai123",
+        database="verztec",
+        cursorclass=pymysql.cursors.DictCursor
     )
+    
+@app.get("/users")
+async def get_users():
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM users")
+            users = cursor.fetchall()  # Now a list of dicts
+        return users
+    finally:
+        conn.close()
+        
+@app.put("/users/{user_id}")
+async def update_user(user_id: int, user: UpdateUser):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            sql = """
+                UPDATE users
+                SET username=%s, email=%s, department=%s, role=%s, country=%s, updated_at=NOW()
+                WHERE user_id=%s
+            """
+            cursor.execute(sql, (user.username, user.email, user.department, user.role, user.country, user_id))
+            conn.commit()
+            return {"message": "User updated successfully"}
+    finally:
+        conn.close()
+        
+@app.get("/list-files", response_model=List[str])
+def list_files():
+    folder_path = Path(__file__).resolve().parent.parent / "pipeline" / "data" / "raw_data"
+    if not folder_path.exists():
+        return []
+    return [f.name for f in folder_path.iterdir() if f.is_file()]
+
+@app.delete("/delete-file/{filename}")
+def delete_file(filename: str):
+    folder_path = Path(__file__).resolve().parent.parent / "pipeline" / "data" / "raw_data"
+    file_path = folder_path / filename
+
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        file_path.unlink()
+        return JSONResponse(content={"message": f"Deleted '{filename}' successfully"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+        
 
 # === Models ===
 class Role(str, Enum):
