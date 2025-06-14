@@ -12,6 +12,7 @@ import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
 import ReactMarkdown from 'react-markdown';
 import FloatingWindow from "@/components/FloatingWindow";
+import GLBAvatar from '@/components/GLBAvatar';
 
 const models = [
   {
@@ -236,7 +237,7 @@ function App() {
 
         {/* Search Popup */}
         <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-
+        <GLBAvatar />
         <FloatingWindow />
       </div>
     </div>
