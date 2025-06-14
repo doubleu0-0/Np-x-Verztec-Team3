@@ -26,6 +26,7 @@
 
 
 
+
 ## Frontend (Vite, React, TailwindCSS)
 
 ### Dependencies 
