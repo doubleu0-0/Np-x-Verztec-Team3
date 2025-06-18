@@ -3,7 +3,7 @@ import Sidebar from '@/components/Sidebar';
 import SearchPopup from '@/components/SearchPopup';
 import Chatbot from '@/components/Chatbot';
 import ChatInput from '@/components/ChatInput';
-import SignIn from '@/components/SignIn';
+import SignIn from '@/components/SignIn';   
 import ProfileDropdown from '@/components/ProfileDropdown';
 import ModelSelector from '@/components/ModelSelector';
 import UploadXlsxButton from '@/components/UploadXlsxButton';
@@ -12,6 +12,7 @@ import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
 import ReactMarkdown from 'react-markdown';
 import FloatingWindow from "@/components/FloatingWindow";
+import GLBAvatar from '@/components/GLBAvatar';
 
 const models = [
   {
@@ -44,6 +45,7 @@ function App() {
   const [selectedModel, setSelectedModel] = useState('llama3.2:latest');
   const [view, setView] = useState('chat');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
 
   const modelDropdownRef = useRef(null);
 
@@ -90,11 +92,32 @@ function App() {
     setIsSearchOpen(true);
   };
 
-  const handleLogin = (email) => {
+  const handleLogin = async (email) => {
+    const token = localStorage.getItem('token');
+    const profileRes = await fetch('http://localhost:8000/profile', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const profileData = await profileRes.json();
+    setUserProfile(profileData.session); // session contains role, country, department, etc.
     setIsLoggedIn(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        await fetch('http://localhost:8000/logout', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } catch (err) {
+        // Optionally handle error (e.g., network issues)
+        console.error('Logout failed:', err);
+      }
+    }
+    localStorage.removeItem('token');
     setIsLoggedIn(false);
     setSelectedProfile(null);
   };
@@ -167,7 +190,7 @@ function App() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {/* View Buttons */}
+                {/* No buttons for the peasants */}
                 <div className="flex gap-2">
                   <button
                     onClick={() => setView('chat')}
@@ -177,22 +200,26 @@ function App() {
                   >
                     Chat
                   </button>
-                  <button
-                    onClick={() => setView('uploadXlsx')}
-                    className={`px-3 py-1 text-sm rounded ${
-                      view === 'uploadXlsx' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
-                    }`}
-                  >
-                    Upload Excel
-                  </button>
-                  <button
-                    onClick={() => setView('uploadFile')}
-                    className={`px-3 py-1 text-sm rounded ${
-                      view === 'uploadFile' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
-                    }`}
-                  >
-                    Upload File
-                  </button>
+                  {(userProfile?.role === 'ADMIN' || userProfile?.role === 'MANAGER') && (
+                    <>
+                      <button
+                        onClick={() => setView('uploadXlsx')}
+                        className={`px-3 py-1 text-sm rounded ${
+                          view === 'uploadXlsx' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                        }`}
+                      >
+                        Upload Excel
+                      </button>
+                      <button
+                        onClick={() => setView('uploadFile')}
+                        className={`px-3 py-1 text-sm rounded ${
+                          view === 'uploadFile' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                        }`}
+                      >
+                        Upload File
+                      </button>
+                    </>
+                  )}
                 </div>
                 {/* Profile Dropdown */}
                 <ProfileDropdown
@@ -213,7 +240,7 @@ function App() {
             {/* Main View */}
             <main className="flex-1 min-h-0 flex flex-col">
               {view === 'chat' && (
-                <Chatbot selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+                <Chatbot userProfile={userProfile} selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
               )}
               {view === 'uploadXlsx' && <UploadXlsxButton />}
               {view === 'uploadFile' && <UploadFile />}
@@ -236,7 +263,7 @@ function App() {
 
         {/* Search Popup */}
         <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-
+        {/*<GLBAvatar />*/}
         <FloatingWindow />
       </div>
     </div>

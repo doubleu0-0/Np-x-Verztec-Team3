@@ -9,17 +9,21 @@
 ### Setup
 
 - `cd backend`
+- `Get-Command python` and get the Source e.g "C:\Program Files\Python38\python.exe"
 - Create a virtual environment (powershell): & "C:\Program Files\Python38\python.exe" -m venv venv
 - Activate the virtual environment:
   - Mac/Linux: `source ./venv/bin/activate`
   - Windows ((powershell)): `.\venv\Scripts\activate.ps1`
 - Install the dependencies from [requirements.txt](./backend/requirements.txt)
   - `pip install -r requirements.txt`
+- Edit the database credentials in Watcher.py and backend\main.py
 
 ### Run the backend
 
 - `ollama pull llama3.2`
+- `ollama pull llama3.2:1b`
 - `uvicorn main:app --reload`
+
 
 
 
@@ -34,6 +38,7 @@
 - `cd frontend`
 - `npm install`
 - `npm install axios`
+- `npm install three@0.153.0 @react-three/fiber@8.13.6 @react-three/drei@9.53.1 --save`
 
 ### Run the App
 
