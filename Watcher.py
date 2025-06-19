@@ -1,12 +1,12 @@
-#1. create watcher.py in the root directory (same as ReadMe.md)
-
 import time
+import os
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import subprocess
 import pymysql
 import logging
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
@@ -14,25 +14,36 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 # Automatically resolve absolute project path
 PROJECT_ROOT = Path(__file__).resolve().parent
 WATCH_FOLDER = PROJECT_ROOT / "pipeline" / "data" / "raw_data"
-PIPELINE_SCRIPT = PROJECT_ROOT / "pipeline" / "src" / "pipeline.py"
+PIPELINE_SCRIPT = PROJECT_ROOT / "pipeline" / "src" / "chroma_db_pipeline.py"
 
-# ✅ Updated database credentials
+# Load environment variables from .env
+load_dotenv(PROJECT_ROOT / ".env")
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
+DB_NAME = os.getenv("DB_NAME")
+
+# Load database configuration
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "Asimplepassword1!",
-    "database": "verztec"
+    "host": DB_HOST,
+    "user": DB_USER,
+    "password": DB_PASS,
+    "database": DB_NAME
 }
 
 class WatcherHandler(FileSystemEventHandler):
     def on_created(self, event):
         if not event.is_directory:
-            logging.info(f"🆕 New file created: {event.src_path}")
-
             file_path = Path(event.src_path)
+            if file_path.suffix.lower() == ".json":
+                logging.info(f"Ignored .json file: {file_path.name}")
+                return  # Skip processing for .json files
+            
+            logging.info(f"New file created: {event.src_path}")
+
             file_name = file_path.name
             file_type = file_path.suffix.lstrip(".").lower()
-            uploaded_by = 1  # Modify dynamically if needed
+            uploaded_by = 1 
             department = "IT"
             access_level = "ALL"
 
@@ -50,11 +61,13 @@ class WatcherHandler(FileSystemEventHandler):
                 logging.error(f"❌ Failed to insert into database: {e}")
 
             try:
+                logging.info("Triggering pipeline...")
                 subprocess.run([
                     "python",
                     str(PIPELINE_SCRIPT)
                 ])
                 logging.info("🚀 Pipeline triggered successfully.")
+                logging.info(f"👀 Watching folder: {WATCH_FOLDER}")
             except subprocess.CalledProcessError as e:
                 logging.error(f"❌ Failed to run pipeline.py: {e}")
 

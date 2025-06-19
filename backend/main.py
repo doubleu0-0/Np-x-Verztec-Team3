@@ -1,5 +1,5 @@
 # === FastAPI Core ===
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, Form
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -20,11 +20,15 @@ from openpyxl import load_workbook
 
 # === LLMs & Vector Store ===
 import ollama
+import chromadb
 from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core import Settings, VectorStoreIndex, StorageContext, load_index_from_storage
-from llama_index.vector_stores.faiss import FaissVectorStore
+from llama_index.core import Settings, StorageContext, VectorStoreIndex, get_response_synthesizer
+from llama_index.vector_stores.chroma import ChromaVectorStore
+from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
+from llama_index.core.retrievers import VectorIndexRetriever
+from llama_index.core.query_engine import RetrieverQueryEngine
 
 # === Utilities ===
 from datetime import datetime, timedelta
@@ -32,14 +36,16 @@ from urllib.parse import quote
 from enum import Enum
 from typing import Generator, Optional, List
 import re
-import faiss
 import io
 import os
 import json
-import shutil 
+import shutil
 from pathlib import Path
+
+# --- REDIS ---
 import redis
 from fastapi import Header, Security
+from typer import prompt
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = PROJECT_ROOT / "pipeline" / "data" / "raw_data"
@@ -72,36 +78,39 @@ remote_base_url = "http://localhost:11434"
 
 # Instantiate the Ollama LLM
 llm = Ollama(model="llama3.2:latest", request_timeout=120.0, temperature=0, context_window=4096, base_url=remote_base_url)
+light_llm = Ollama(model="llama3.2:1b",context_window=1024,base_url=remote_base_url)
 Settings.llm = llm
 memory = ChatMemoryBuffer.from_defaults(token_limit=1024)
 
 
-# FAISS index loading
-persist_dir = PROJECT_ROOT / "pipeline" / "data" / "Embedded"
-faiss_path = "faiss.index"
-faiss_index_path = persist_dir / faiss_path
+# Initialize ChromaDB client
+PERSIST_DIR = PROJECT_ROOT / "pipeline" / "data" / "ChromaDB"
 
-if faiss_index_path.exists():
-    faiss_index = faiss.read_index(str(faiss_index_path))
-    vector_store = FaissVectorStore(faiss_index=faiss_index)
-    storage_context = StorageContext.from_defaults(persist_dir=str(persist_dir), vector_store=vector_store)
-    index = load_index_from_storage(storage_context)
-    query_engine = index.as_query_engine(similarity_top_k=5, streaming=True)
-else:
-    faiss_index = None
-    vector_store = None
-    storage_context = None
-    index = None
-    query_engine = None
-    print(f"WARNING: FAISS index not found at {faiss_index_path}. Vector search will be unavailable until the index is built.")
+db = chromadb.PersistentClient(path=str(PERSIST_DIR))
+chroma_collection = db.get_or_create_collection("quickstart")
+vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+storage_context = StorageContext.from_defaults(vector_store=vector_store)
+index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
+query_engine = index.as_query_engine(similarity_top_k=5, streaming=True)
 
-# This is llama-mini
 
-light_llm = Ollama(
-    model="llama3.2:1b",
-    context_window=1024,
-    base_url=remote_base_url
-)
+# --- Utility to get user info from token/redis ---
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        session = redis_client.get(f"user_token:{user_id}")
+        if not session:
+            raise HTTPException(status_code=401, detail="Session expired or invalid")
+        session_data = json.loads(session)
+        return session_data
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
 
 # Prompt template
 prompt_template = """
@@ -163,23 +172,6 @@ def extract_questions(user_input: str) -> list[str]:
             question_list.append(f"{label.strip()}: {question.strip()}")
 
     return question_list
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-# --- Utility to get user info from token/redis ---
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("user_id")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        session = redis_client.get(f"user_token:{user_id}")
-        if not session:
-            raise HTTPException(status_code=401, detail="Session expired or invalid")
-        session_data = json.loads(session)
-        return session_data
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
 
 # --- Update /process endpoint ---
 @app.post("/process")
@@ -246,9 +238,41 @@ async def stream_answer(
     data: UserMessage,
     current_user: dict = Depends(get_current_user)
 ):
-    user_prompt = data.message
+    
+    # Set up the LLM based on user role
+    role = current_user.get("role")
+    country = current_user.get("country")
+
+    if role == "ADMIN":
+        retriever = VectorIndexRetriever(index=index, similarity_top_k=5)
+    else:
+        filters = MetadataFilters(
+            filters=[
+                MetadataFilter(key=country, value="True", operator=FilterOperator.EQUAL)
+            ]
+        )
+        retriever = VectorIndexRetriever(index=index, similarity_top_k=5, filters=filters)
+
     llm_model = get_llm(model_name=data.model)
+    response_synthesizer = get_response_synthesizer(response_mode="tree_summarize", llm=llm_model, streaming=True)
+    query_engine = RetrieverQueryEngine(retriever=retriever, response_synthesizer=response_synthesizer)
+    user_prompt = data.message
+    
     print(f"[STREAM] Querying with: {data.message}")
+    response = query_engine.query(f"{user_prompt}")
+
+    if response is None:
+        llm_model = get_llm(model_name="llama3.2:latest")  # Default to latest model
+        fallback_text = llm_model.complete(f"You are Verztec's AI HR assistant. The user asked you about: {user_prompt}. "
+                              "The information was not found in the index, respond with: "
+                              "I am sorry, but I do not have information on (info)."
+                              "This might be due to a lack of permissions."
+                              f"As a {role}, you are allowed to access documents in {country}."
+                              f"User role: {role}, country: {country}.")
+        raw_text = fallback_text.text.strip()
+        return StreamingResponse(iter([raw_text]), media_type="text/plain")
+
+    '''
     chat_engine = index.as_chat_engine(
             chat_mode="context",
             memory=memory,
@@ -262,14 +286,20 @@ async def stream_answer(
             llm=llm_model
         )
     response = chat_engine.stream_chat(data.message)
-
+    '''
     # This buffer will store the full response for logging
     full_response = []
 
     def stream_generator():
+        buffer = io.StringIO()
         # Stream the main response content
-        for token in response.response_gen:
-            yield token
+        try:
+            for token in response.response_gen:
+                if token is not None:
+                    buffer.write(token)
+                    yield token
+        except Exception as e:
+            yield f"\n\n[ERROR streaming response: {e}]"
 
         def get_real_file(filename):
             base = Path(filename).with_suffix('')
@@ -357,10 +387,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 # === DB Connection ===
 def get_db():
     return pymysql.connect(
-        host="localhost",
-        user="root",
-        password="Asimplepassword1!",
-        database="verztec",
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASS,
+        database=DB_NAME,
         cursorclass=pymysql.cursors.DictCursor
     )
 
@@ -642,28 +672,28 @@ def check_manager_permission(current_user, target_department, target_country):
 @app.post("/upload-file")
 async def upload_file(
     file: UploadFile = File(...),
+    countries: str = Form(...),
+    departments: str = Form(...),
+    visibility: str = Form(...),
     current_user: dict = Depends(get_current_user)
 ):
+    countries_list = json.loads(countries)
+    departments_list = json.loads(departments)
+
     file_path = UPLOAD_DIR / file.filename
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # --- LOGGING to upload_file_logs ---
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO upload_file_logs (user_id, filename)
-            VALUES (%s, %s)
-        """, (
-            current_user["user_id"],
-            file.filename
-        ))
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Failed to log upload: {e}")
+    # --- Save metadata as a sidecar JSON file ---
+    meta = {
+        "departments": departments_list,
+        "countries": countries_list,
+        "visibility": visibility,
+        "uploaded_by": current_user.get("username"),
+    }
+    meta_path = file_path.with_suffix(file_path.suffix + ".meta.json")
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
 
     return {"message": f"File '{file.filename}' uploaded successfully."}
 
