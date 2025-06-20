@@ -242,13 +242,15 @@ async def stream_answer(
     # Set up the LLM based on user role
     role = current_user.get("role")
     country = current_user.get("country")
+    department = current_user.get("department")
 
     if role == "ADMIN":
         retriever = VectorIndexRetriever(index=index, similarity_top_k=5)
     else:
         filters = MetadataFilters(
             filters=[
-                MetadataFilter(key=country, value="False", operator=FilterOperator.EQ)
+                MetadataFilter(key=country, value="True", operator=FilterOperator.EQ),
+                MetadataFilter(key=department, value="True", operator=FilterOperator.EQ)
             ]
         )
         retriever = VectorIndexRetriever(index=index, similarity_top_k=5, filters=filters)
