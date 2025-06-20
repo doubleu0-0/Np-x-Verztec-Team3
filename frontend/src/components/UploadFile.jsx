@@ -91,11 +91,17 @@ export default function UploadFile() {
 
   // Handle department checkbox
   const handleDepartmentChange = (dept) => {
-    setSelectedDepartments((prev) =>
-      prev.includes(dept)
-        ? prev.filter((d) => d !== dept)
-        : [...prev, dept]
-    );
+    if (user.role !== 'ADMIN') {
+      // Only allow one: either ALL or their department
+      setSelectedDepartments([dept]);
+    } else {
+      // Usual multi-select for admins
+      setSelectedDepartments((prev) =>
+        prev.includes(dept)
+          ? prev.filter((d) => d !== dept)
+          : [...prev, dept]
+      );
+    }
   };
 
   // Handle visibility change
@@ -189,8 +195,11 @@ export default function UploadFile() {
       ? ALL_COUNTRIES
       : [user.country];
 
-  // Departments by role (could be filtered further if needed)
-  const departments = ALL_DEPARTMENTS;
+  // Departments by role
+  const departments =
+    user && user.role === 'ADMIN'
+      ? ALL_DEPARTMENTS
+      : ['ALL', user.department];
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4">
@@ -265,11 +274,16 @@ export default function UploadFile() {
           <label className="block font-medium mb-1 text-gray-900 dark:text-gray-100">Departments:</label>
           <div className="flex gap-4 flex-wrap">
             {departments.map((dept) => (
-              <label key={dept} className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
+              <label key={dept}>
                 <input
                   type="checkbox"
                   checked={selectedDepartments.includes(dept)}
                   onChange={() => handleDepartmentChange(dept)}
+                  disabled={
+                    user.role !== 'ADMIN' &&
+                    dept !== 'ALL' &&
+                    dept !== user.department
+                  }
                 />
                 {dept}
               </label>
@@ -313,22 +327,28 @@ export default function UploadFile() {
       {/* File List */}
       <div className="mt-10">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">Files in raw_data</h2>
-        {fileList.length > 0 ? (
+        {fileList.filter(
+          (filename) => !filename.endsWith('.txt') && !filename.endsWith('.json')
+        ).length > 0 ? (
           <ul className="space-y-2">
-            {fileList.map((filename, idx) => (
-              <li
-                key={idx}
-                className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded shadow-sm border border-gray-200 dark:border-gray-700"
-              >
-                <span className="text-gray-800 dark:text-gray-100">{filename}</span>
-                <button
-                  onClick={() => handleDelete(filename)}
-                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm"
+            {fileList
+              .filter(
+                (filename) => !filename.endsWith('.txt') && !filename.endsWith('.json')
+              )
+              .map((filename, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded shadow-sm border border-gray-200 dark:border-gray-700"
                 >
-                  Delete
-                </button>
-              </li>
-            ))}
+                  <span className="text-gray-800 dark:text-gray-100">{filename}</span>
+                  <button
+                    onClick={() => handleDelete(filename)}
+                    className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm"
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
           </ul>
         ) : (
           <p className="text-gray-500 dark:text-gray-400">No files found. Upload a file to get started.</p>

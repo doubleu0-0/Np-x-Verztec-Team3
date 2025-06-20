@@ -41,6 +41,7 @@ import os
 import json
 import shutil
 from pathlib import Path
+import itertools
 
 # --- REDIS ---
 import redis
@@ -238,7 +239,6 @@ async def stream_answer(
     data: UserMessage,
     current_user: dict = Depends(get_current_user)
 ):
-    
     # Set up the LLM based on user role
     role = current_user.get("role")
     country = current_user.get("country")
@@ -248,7 +248,7 @@ async def stream_answer(
     else:
         filters = MetadataFilters(
             filters=[
-                MetadataFilter(key=country, value="True", operator=FilterOperator.EQUAL)
+                MetadataFilter(key=country, value="False", operator=FilterOperator.EQ)
             ]
         )
         retriever = VectorIndexRetriever(index=index, similarity_top_k=5, filters=filters)
@@ -257,20 +257,64 @@ async def stream_answer(
     response_synthesizer = get_response_synthesizer(response_mode="tree_summarize", llm=llm_model, streaming=True)
     query_engine = RetrieverQueryEngine(retriever=retriever, response_synthesizer=response_synthesizer)
     user_prompt = data.message
-    
+
     print(f"[STREAM] Querying with: {data.message}")
     response = query_engine.query(f"{user_prompt}")
 
-    if response is None:
-        llm_model = get_llm(model_name="llama3.2:latest")  # Default to latest model
-        fallback_text = llm_model.complete(f"You are Verztec's AI HR assistant. The user asked you about: {user_prompt}. "
-                              "The information was not found in the index, respond with: "
-                              "I am sorry, but I do not have information on (info)."
-                              "This might be due to a lack of permissions."
-                              f"As a {role}, you are allowed to access documents in {country}."
-                              f"User role: {role}, country: {country}.")
+    # Helper to check for boilerplate/empty responses
+    def is_response_empty(resp):
+        BOILERPLATE = [
+            "no response",
+            "no relevant information found",
+            "no answer found",
+            "no content",
+            "empty response"
+        ]
+        if resp is None:
+            return True
+        if hasattr(resp, "response"):
+            text = str(resp.response).strip().lower()
+            if not text or text in BOILERPLATE:
+                return True
+        if hasattr(resp, "response_gen"):
+            try:
+                gen = resp.response_gen
+                peeked = list(itertools.islice(gen, 3))
+                # Debug: print the peeked chunks
+                print("[DEBUG] Peeked streaming chunks:")
+                for i, chunk in enumerate(peeked):
+                    print(f"  Chunk {i+1}: {repr(chunk)}")
+                # Re-chain for later streaming
+                resp.response_gen = itertools.chain(peeked, gen)
+                joined = " ".join(str(t).strip().lower() for t in peeked if t)
+                for phrase in BOILERPLATE:
+                    if joined.startswith(phrase):
+                        return True
+                if not joined:
+                    return True
+            except Exception as e:
+                print(f"[DEBUG] Exception while peeking response_gen: {e}")
+                return True
+        return False
+
+    is_empty = is_response_empty(response)
+
+    if is_empty:
+        print("Empty Response")
+        llm_model = get_llm(model_name="llama3.2:latest")
+        fallback_text = llm_model.complete(
+            f"You are Verztec's AI HR assistant. The user asked you about: {user_prompt}. "
+            "The information was not found in the index. "
+            "Respond ONLY in this exact format and do not add any extra information, tips, suggestions, or explanations:\n\n"
+            "I am sorry, but I do not have information on (info).\n"
+            "This might be due to a lack of permissions.\n"
+            f"As a {role}, you are allowed to access documents in {country}.\n"
+            f"User role: {role}, country: {country}. User question: {user_prompt}\n"
+        )
         raw_text = fallback_text.text.strip()
-        return StreamingResponse(iter([raw_text]), media_type="text/plain")
+        def fallback_stream():
+            yield raw_text
+        return StreamingResponse(fallback_stream(), media_type="text/plain")
 
     '''
     chat_engine = index.as_chat_engine(
@@ -292,7 +336,6 @@ async def stream_answer(
 
     def stream_generator():
         buffer = io.StringIO()
-        # Stream the main response content
         try:
             for token in response.response_gen:
                 if token is not None:
@@ -312,14 +355,12 @@ async def stream_answer(
 
         # Generate citations (Only show the unqiue files of the top 3 nodes)
         top_nodes = response.source_nodes[:3]
-
         cited_docs = {}
         for node_score in top_nodes:
             node = node_score.node
             original = node.metadata.get("source") or node.metadata.get("title")
             if not original:
                 continue
-
             real_file = get_real_file(original)
             if real_file not in cited_docs:
                 url = f"http://localhost:8000/download/{quote(real_file)}"

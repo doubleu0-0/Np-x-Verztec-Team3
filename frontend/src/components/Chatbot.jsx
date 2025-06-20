@@ -93,6 +93,7 @@ function Chatbot({ userProfile }) {
 
   async function streamAnswer(questionText, assistantIndex) {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('http://localhost:8000/stream', {
         method: 'POST',
         headers: {
@@ -105,34 +106,28 @@ function Chatbot({ userProfile }) {
       if (!res.ok) throw new Error(`Stream error: ${res.status}`);
 
       const reader = res.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      setStatus("🔁 Starting stream for: " + questionText);
+      const decoder = new TextDecoder();
+      let done = false;
+      let gotAny = false;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-
-        setMessages(draft => {
-          if (!draft[assistantIndex]) {
-            console.warn("Invalid assistant index:", assistantIndex);
-            return;
-          }
-
-          // Force re-render by replacing the entire object
-          draft[assistantIndex] = {
-            ...draft[assistantIndex],
-            content: draft[assistantIndex].content + chunk,
-          };
-        });
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        if (value) {
+          gotAny = true;
+          const chunk = decoder.decode(value);
+          setMessages(draft => {
+            if (!draft[assistantIndex]) return;
+            draft[assistantIndex].content += chunk;
+          });
+        }
       }
 
       setMessages(draft => {
         if (!draft[assistantIndex]) return;
         draft[assistantIndex].loading = false;
       });
-
+      
       setStatus("Done :)");
     } catch (err) {
       setStatus(`✗ Stream error: ${err.message}`);
