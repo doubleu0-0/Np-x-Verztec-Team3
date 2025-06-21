@@ -44,3 +44,18 @@
 
 - `npm run dev`
 - click on the local vite url shown
+
+
+
+
+## Redis
+
+### Setup
+
+- Redis (Download msi from https://github.com/tporadowski/redis/releases)
+- Select default settings during initial Redis setup
+
+### Run Redis
+
+- `cd "C:\Program Files\Redis"`
+- `.\redis-server.exe --port 6380`
