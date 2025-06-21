@@ -1,3 +1,4 @@
+// Updated App.jsx with TTSProvider integration
 import { useState, useEffect, useRef } from 'react';
 import Sidebar from '@/components/Sidebar';
 import SearchPopup from '@/components/SearchPopup';
@@ -13,6 +14,7 @@ import white_logo from '@/assets/images/logo-white.png';
 import ReactMarkdown from 'react-markdown';
 import FloatingWindow from "@/components/FloatingWindow";
 import GLBAvatar from '@/components/GLBAvatar';
+import { TTSProvider } from '@/contexts/TTSContext'; // Add this import
 
 const models = [
   {
@@ -35,7 +37,7 @@ const models = [
   },
 ];
 
-function App() {
+function AppContent() { // Rename the main component
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -98,7 +100,7 @@ function App() {
       headers: { Authorization: `Bearer ${token}` }
     });
     const profileData = await profileRes.json();
-    setUserProfile(profileData.session); // session contains role, country, department, etc.
+    setUserProfile(profileData.session);
     setIsLoggedIn(true);
   };
 
@@ -113,7 +115,6 @@ function App() {
           },
         });
       } catch (err) {
-        // Optionally handle error (e.g., network issues)
         console.error('Logout failed:', err);
       }
     }
@@ -176,7 +177,7 @@ function App() {
                   </button>
                   {showModelDropdown && (
                     <div className="absolute left-0 mt-4 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
-                      style={{ marginTop: '1.5rem' }} // Extra margin above dropdown
+                      style={{ marginTop: '1.5rem' }}
                     >
                       <ModelSelector
                         selectedModel={selectedModel}
@@ -190,7 +191,6 @@ function App() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {/* No buttons for the peasants */}
                 <div className="flex gap-2">
                   <button
                     onClick={() => setView('chat')}
@@ -221,7 +221,6 @@ function App() {
                     </>
                   )}
                 </div>
-                {/* Profile Dropdown */}
                 <ProfileDropdown
                   selectedProfile={selectedProfile}
                   setSelectedProfile={setSelectedProfile}
@@ -263,10 +262,19 @@ function App() {
 
         {/* Search Popup */}
         <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-        {/*<GLBAvatar />*/}
+        <GLBAvatar />
         <FloatingWindow />
       </div>
     </div>
+  );
+}
+
+// Main App component wrapped with TTSProvider
+function App() {
+  return (
+    <TTSProvider>
+      <AppContent />
+    </TTSProvider>
   );
 }
 
