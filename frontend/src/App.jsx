@@ -46,6 +46,7 @@ function App() {
   const [view, setView] = useState('chat');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
+  const [selectedLogId, setSelectedLogId] = useState(null); // NEW
 
   const modelDropdownRef = useRef(null);
 
@@ -240,7 +241,11 @@ function App() {
             {/* Main View */}
             <main className="flex-1 min-h-0 flex flex-col">
               {view === 'chat' && (
-                <Chatbot userProfile={userProfile} selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+                <Chatbot 
+                  userProfile={userProfile}
+                  selectedModel={selectedModel}
+                  setSelectedModel={setSelectedModel}
+                  selectedLogId={selectedLogId} // PASS IT TO CHATBOT/>
               )}
               {view === 'uploadXlsx' && <UploadXlsxButton />}
               {view === 'uploadFile' && <UploadFile />}
@@ -262,7 +267,16 @@ function App() {
         </div>
 
         {/* Search Popup */}
-        <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+        {/* PASS THE onChatSelect FUNCTION TO SearchPopup */}
+        <SearchPopup
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          onChatSelect={(logId) => {
+            setSelectedLogId(logId);    // track which chat to scroll to
+            setIsSearchOpen(false);     // close search popup
+            setView("chat");            // show chat view
+          }}
+        />
         {/*<GLBAvatar />*/}
         <FloatingWindow />
       </div>
