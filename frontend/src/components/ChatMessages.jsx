@@ -34,7 +34,11 @@ function ChatMessages({ messages, isLoading }) {
     if (last.role === 'assistant' && last.content && !last.loading) {
       const speakWithFemaleVoice = () => {
         const voices = speechSynthesis.getVoices();
-        
+
+        // Trim at "📄"
+        const trimmedContent = last.content.split("📄")[0];
+        if (trimmedContent.trim().length === 0) return;
+
         // Try to find a female-sounding English voice
         const femaleVoice = voices.find(
           (v) =>
@@ -45,7 +49,7 @@ function ChatMessages({ messages, isLoading }) {
             v.name.toLowerCase().includes('google us english')) // Chrome
         ) || voices.find(v => v.lang === 'en-US'); // fallback
 
-        const utterance = new SpeechSynthesisUtterance(last.content);
+        const utterance = new SpeechSynthesisUtterance(trimmedContent);
         utterance.voice = femaleVoice;
         utterance.lang = 'en-US';
         utterance.pitch = 1;
