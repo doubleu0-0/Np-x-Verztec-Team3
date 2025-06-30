@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react'; 
 import { useImmer } from 'use-immer';
 import ChatMessages from '@/components/ChatMessages';
 import ChatInput from '@/components/ChatInput';
@@ -6,16 +6,42 @@ import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
 import ModelSelector from '@/components/ModelSelector';
 
-
-function Chatbot({ userProfile }) {
+function Chatbot({ userProfile, selectedLogId = null }) {
   const [messages, setMessages] = useImmer([]); // Stores chat messages
   const [newMessage, setNewMessage] = useState(''); // Stores the current input message
   const [status, setStatus] = useState(''); // Which phase the bot is in (Searching database, preprocessing, etc)
-  const [selectedModel, setSelectedModel] = useState('llama3.2:latest');
+  const [selectedModel, setSelectedModel] = useState('llama3.2:latest'); 
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [loadingLog, setLoadingLog] = useState(false); 
   const messagesEndRef = useRef(null); // Just for auto scrolling
 
   const isLoading = messages.length && messages[messages.length - 1].loading;
+
+  // Chat log loading logic
+  useEffect(() => {
+    if (!selectedLogId) return;
+
+    const fetchLog = async () => {
+      setLoadingLog(true);
+      setStatus('🔄 Loading previous chat...');
+      try {
+        const res = await fetch(`http://localhost:8000/chat-log/${selectedLogId}`);
+        if (!res.ok) throw new Error(`Failed to load chat log: ${res.status}`);
+        const data = await res.json();
+        if (!data.messages) throw new Error('Invalid data format');
+
+        setMessages(data.messages);
+        setStatus('✅ Chat loaded.');
+      } catch (err) {
+        console.error(err);
+        setStatus(`✗ Could not load chat: ${err.message}`);
+      } finally {
+        setLoadingLog(false);
+      }
+    };
+
+    fetchLog();
+  }, [selectedLogId]);
 
   // Auto scrolling
   useEffect(() => {
@@ -29,7 +55,6 @@ function Chatbot({ userProfile }) {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
-
 
   async function submitNewMessage() {
     const trimmedMessage = newMessage.trim();
@@ -69,7 +94,7 @@ function Chatbot({ userProfile }) {
       setStatus(`Extracted ${parsedQuestions.length} question(s).`);
 
       const assistantIndexes = [];
-
+      
       // Step 2: Add original message and extracted questions
       setMessages(draft => {
         parsedQuestions.forEach(() => {
@@ -78,7 +103,7 @@ function Chatbot({ userProfile }) {
           assistantIndexes.push(index);
         });
       });
-      
+
       // Step 3: Stream answer for each question
       parsedQuestions.forEach((q, i) => {
         setTimeout(() => {
@@ -93,6 +118,7 @@ function Chatbot({ userProfile }) {
 
   async function streamAnswer(questionText, assistantIndex) {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('http://localhost:8000/stream', {
         method: 'POST',
         headers: {
