@@ -40,6 +40,9 @@ import shutil
 from pathlib import Path
 import redis
 from fastapi import Header, Security
+import whisper
+import openai
+from datetime import datetime, timedelta
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = PROJECT_ROOT / "pipeline" / "data" / "raw_data"
@@ -681,6 +684,120 @@ def logout(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+# for speech-to-text
+# change to medium or large for better performance only with GPU
+model = whisper.load_model("base")
+
+@app.post("/transcribe")
+async def transcribe(file: UploadFile = File(...)):
+    if not file:
+        return {"text": "No file uploaded."}
+
+    # Save uploaded file temporarily
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        # Load, process, and transcribe audio
+        audio = whisper.load_audio(tmp_path)
+        audio = whisper.pad_or_trim(audio)
+        mel = whisper.log_mel_spectrogram(audio).to(model.device)
+
+        # Detect language
+        _, probs = model.detect_language(mel)
+        detected_lang = max(probs, key=probs.get)
+        print(f"Detected language: {detected_lang}")
+
+        options = whisper.DecodingOptions(language=detected_lang)
+        result = whisper.decode(model, mel, options)
+
+        return {"text": result.text}
+    finally:
+        os.remove(tmp_path)
+
+# for chat search functionality
+@app.get("/search")
+def search_chats(q: str = ""):
+    connection = get_db()
+    try:
+        with connection.cursor() as cursor:
+            if q.strip() == "":
+                # Return chats created in the last 30 days
+                thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+                sql = """
+                    SELECT log_id, query, response, created_at
+                    FROM chatbot_logs
+                    WHERE created_at >= %s
+                    ORDER BY created_at DESC
+                """
+                cursor.execute(sql, (thirty_days_ago,))
+            else:
+                # Split search query into words (and ignore very short/common words)
+                words = [word.lower() for word in q.strip().split() if len(word) >= 1]
+                if not words:
+                    return []
+
+                # Build dynamic WHERE clause: all words must be present
+                like_clauses = " AND ".join([
+                    "(LOWER(query) LIKE %s OR LOWER(response) LIKE %s)"
+                    for _ in words
+                ])
+                sql = f"""
+                    SELECT log_id, query, response, created_at
+                    FROM chatbot_logs
+                    WHERE {like_clauses}
+                    ORDER BY created_at DESC
+                    LIMIT 20
+                """
+                params = []
+                for word in words:
+                    wildcard = f"%{word}%"
+                    params.extend([wildcard, wildcard])  # one for query, one for response
+
+                cursor.execute(sql, params)
+
+            rows = cursor.fetchall()
+
+            results = [
+                {
+                    "log_id": row[0],
+                    "query": row[1],
+                    "response": row[2],
+                    "created_at": row[3].isoformat() if row[3] else None
+                }
+                for row in rows
+            ]
+
+            return results
+    finally:
+        connection.close()
+
+# for chat search functionality
+@app.get("/chat-log/{log_id}")
+def get_chat_log(log_id: int):
+    connection = get_db()
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            sql = """
+                SELECT query, response
+                FROM chatbot_logs
+                WHERE log_id = %s
+            """
+            cursor.execute(sql, (log_id,))
+            rows = cursor.fetchall()
+
+            if not rows:
+                raise HTTPException(status_code=404, detail="Log not found")
+
+            messages = []
+            for row in rows:
+                messages.append({"role": "user", "content": row["query"]})
+                messages.append({"role": "assistant", "content": row["response"]})
+
+            return {"messages": messages}
+    finally:
+        connection.close()
 
 # Serve React frontend
 # app.mount(
