@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*grpcio.*", module="opentelemetry.*")
 # === FastAPI Core ===
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, Form
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
@@ -29,12 +31,14 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
+from llama_index.core.base.embeddings.base import BaseEmbedding
 
 # === Utilities ===
 from datetime import datetime, timedelta
 from urllib.parse import quote
 from enum import Enum
-from typing import Generator, Optional, List
+from sentence_transformers import SentenceTransformer
+from typing import Generator, Optional, List, Union
 import re
 import io
 import os
@@ -42,11 +46,16 @@ import json
 import shutil
 from pathlib import Path
 import itertools
+import tempfile
+import whisper
+import openai
+from datetime import datetime, timedelta
 
 # --- REDIS ---
 import redis
 from fastapi import Header, Security
 from typer import prompt
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = PROJECT_ROOT / "pipeline" / "data" / "raw_data"
@@ -69,12 +78,12 @@ DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 DB_NAME = os.getenv("DB_NAME")
 
+
 # Connect to Redis
 redis_client = redis.Redis(host='localhost', port=6380, db=0, decode_responses=True)
 
 # Set up Ollama and HuggingFace embedding
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
-embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
 remote_base_url = "http://localhost:11434"
 
 # Instantiate the Ollama LLM
@@ -86,9 +95,48 @@ memory = ChatMemoryBuffer.from_defaults(token_limit=1024)
 
 # Initialize ChromaDB client
 PERSIST_DIR = PROJECT_ROOT / "pipeline" / "data" / "ChromaDB"
+model = SentenceTransformer("intfloat/e5-large-v2")
+
+# ChromaDB embedding function
+class HFChromaEmbedding:
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, input: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
+        if isinstance(input, str):
+            input = [f"passage: {input}"]
+            return self.model.encode(input, convert_to_numpy=True).tolist()[0]
+        else:
+            input = [f"passage: {text}" for text in input]
+            return self.model.encode(input, convert_to_numpy=True).tolist()
+
+    def name(self) -> str:
+        return "HFChromaEmbedding-e5-large-v2"
+
+chroma_embedding_fn = HFChromaEmbedding(model)
+
+# LlamaIndex embedding class
+class HFLlamaEmbedding(BaseEmbedding):
+    model: SentenceTransformer
+    def __init__(self, model):
+        super().__init__(model=model)
+
+    def _get_text_embedding(self, text: str) -> List[float]:
+        return self.model.encode(f"passage: {text}", convert_to_numpy=True).tolist()
+
+    def _get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
+        return self.model.encode([f"passage: {t}" for t in texts], convert_to_numpy=True).tolist()
+
+    def _get_query_embedding(self, query: str) -> List[float]:
+        return self.model.encode(f"query: {query}", convert_to_numpy=True).tolist()
+
+    async def _aget_query_embedding(self, query: str) -> List[float]:
+        return self._get_query_embedding(query)
+
+llama_embedding_fn = HFLlamaEmbedding(model)
 
 db = chromadb.PersistentClient(path=str(PERSIST_DIR))
-chroma_collection = db.get_or_create_collection("quickstart")
+chroma_collection = db.get_or_create_collection("quickstart", embedding_function=chroma_embedding_fn)
 vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
 index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
@@ -171,10 +219,10 @@ def extract_questions(user_input: str) -> list[str]:
         if match:
             label, question = match.groups()
             question_list.append(f"{label.strip()}: {question.strip()}")
-
+    print(f"[LLM] Extracted questions: {question_list}")
     return question_list
 
-# --- Update /process endpoint ---
+
 @app.post("/process")
 async def process_message(
     data: UserMessage,
@@ -182,58 +230,80 @@ async def process_message(
 ):
     llm_model = get_llm(model_name=data.model)
     questions = extract_questions(data.message)
+    user_prompt = data.message
 
-    response_text = ""
     if not questions:
         print("[INFO] No HR-related questions found. Generating fallback...")
         fallback_prompt = f"""
-            The user said:
+        The user said: "{data.message}"
+        You are Verztec's AI HR assistant. The user did not ask any HR-related questions or concerns.
+        If the message isn't about HR (like leave, claims, benefits, or work policies), reply in a super casual, friendly manner. 
+        No formal greetings, no sign-offs, no long explanations. Just a short, warm, human reply.
+        If the user says something sweet or emotional (like "thank you" or "you're the best"), feel free to respond in kind—e.g., "Aww, thanks!", "You're awesome!", or use emojis.
+        If you're not sure what they meant, gently ask if they have any HR-related questions, but keep it light and informal.
 
-            "{data.message}"
+        Examples:
+        User: Hi
+        Assistant: Hey! 😊
 
-            If the message isn't about HR (like leave, claims, benefits, or work policies), respond naturally
-            and warmly — as if you're a friendly, empathetic colleague. 
-            If the user says something sweet, casual, or emotional (like "I love you", "thank you", or "you're the best"), 
-            feel free to respond in kind — e.g., "Awww, thank you!", "You're so kind!", or "That means a lot 🥹".
+        User: Thanks!
+        Assistant: Aww, thank you! Let me know if you have any HR questions.
 
-            If you're unsure what they meant, gently guide them toward HR-related topics like leave, WFH, or company policy — 
-            but still sound friendly and non-robotic.
+        User: I love you
+        Assistant: Haha, you're the best! ❤️
 
-            Your reply should feel human, light-hearted, and understanding.
-"""
-        chat_engine = index.as_chat_engine(
-            chat_mode="context",
-            memory=memory,
-            system_prompt=(fallback_prompt),
-            llm=llm_model
-        )
-        fallback_response = chat_engine.chat(data.message)
-        response_text = fallback_response.response
-        result = {"questions": [], "fallback": fallback_response.response}
+        User: Hello
+        Assistant: Hi there! How can I help you today?
+
+        Now, reply to the user:
+        """
+        print(f"[Process] Querying with: {user_prompt}")
+        query_engine = index.as_query_engine(streaming=True, llm=llm_model)
+        response = query_engine.query(f"{fallback_prompt}")
+    
+        def stream_generator():
+            buffer = io.StringIO()
+            try:
+                for token in response.response_gen:
+                    if token is not None:
+                        buffer.write(token)
+                        yield token
+            except Exception as e:
+                yield f"\n\n[ERROR streaming response: {e}]"
+
+        # This wrapper allows us to perform logging after streaming is complete
+        def streaming_with_logging():
+            generator = stream_generator()
+            buffer = io.StringIO()
+            for token in generator:
+                buffer.write(token)
+                yield token
+            final_response = buffer.getvalue()
+
+            # Log to DB after full response is available
+            try:
+                conn = get_db()
+                with conn.cursor() as cursor:
+                    sql = """
+                        INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
+                        VALUES (%s, %s, %s, %s)
+                    """
+                    user_id = current_user["user_id"]
+                    conversation_id = str(user_id)
+                    cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
+                conn.commit()
+            finally:
+                conn.close()
+
+        return StreamingResponse(streaming_with_logging(), media_type="text/plain")
     else:
-        response_text = "\n".join(questions)
-        result = {"questions": questions}
-
-    # Log conversation here
-    try:
-        conn = get_db()
-        with conn.cursor() as cursor:
-            sql = """
-                INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
-                VALUES (%s, %s, %s, %s)
-            """
-            user_id = current_user["user_id"]
-            conversation_id = str(user_id)  # Or use a real conversation id if you have one
-
-            cursor.execute(sql, (user_id, conversation_id, data.message, response_text))
-        conn.commit()
-    finally:
-        conn.close()
-
-    return result
+        # Stream the questions as a single JSON object (one chunk)
+        import json
+        def questions_stream():
+            yield json.dumps({"questions": questions})
+        return StreamingResponse(questions_stream(), media_type="application/json")
 
 
-# --- Update /stream endpoint ---
 @app.post("/stream")
 async def stream_answer(
     data: UserMessage,
@@ -318,7 +388,7 @@ async def stream_answer(
             yield raw_text
         return StreamingResponse(fallback_stream(), media_type="text/plain")
 
-    '''
+    ''' # This the old one with chat engine
     chat_engine = index.as_chat_engine(
             chat_mode="context",
             memory=memory,
@@ -333,8 +403,6 @@ async def stream_answer(
         )
     response = chat_engine.stream_chat(data.message)
     '''
-    # This buffer will store the full response for logging
-    full_response = []
 
     def stream_generator():
         buffer = io.StringIO()
@@ -438,15 +506,27 @@ def get_db():
     )
 
 @app.get("/users")
-async def get_users():
-    conn = get_db()
+async def get_users(current_user: dict = Depends(get_current_user)):
+    # Only allow ADMIN and MANAGER roles to view users
+    if current_user["role"] not in ["ADMIN", "MANAGER"]:
+        raise HTTPException(status_code=403, detail="Not authorized to view users")
+    
     try:
+        conn = get_db()
         with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM users")
-            users = cursor.fetchall()  # Now a list of dicts
-        return users
+            cursor.execute("""
+                SELECT user_id, username, email, role, department, country, updated_at
+                FROM users
+                ORDER BY updated_at DESC
+            """)
+            users = cursor.fetchall()
+            return users
+    except Exception as e:
+        print("ERROR in /users:", e)  # <--- Add this line
+        raise HTTPException(status_code=500, detail=f"Failed to fetch users: {str(e)}")
     finally:
         conn.close()
+
 
 @app.get("/list-files", response_model=List[str])
 def list_files():
@@ -717,28 +797,208 @@ async def upload_file(
     file: UploadFile = File(...),
     countries: str = Form(...),
     departments: str = Form(...),
-    visibility: str = Form(...),
     current_user: dict = Depends(get_current_user)
 ):
     countries_list = json.loads(countries)
     departments_list = json.loads(departments)
 
     file_path = UPLOAD_DIR / file.filename
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    
+    try:
+        # Save the file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    # --- Save metadata as a sidecar JSON file ---
-    meta = {
-        "departments": departments_list,
-        "countries": countries_list,
-        "visibility": visibility,
-        "uploaded_by": current_user.get("username"),
-    }
-    meta_path = file_path.with_suffix(file_path.suffix + ".meta.json")
-    with open(meta_path, "w", encoding="utf-8") as f:
-        json.dump(meta, f, indent=2)
+        # Save metadata as sidecar JSON file
+        meta = {
+            "departments": departments_list,
+            "countries": countries_list,
+            "uploaded_by": current_user.get("username"),
+            "upload_time": datetime.now().isoformat()
+        }
+        meta_path = file_path.with_suffix(file_path.suffix + ".meta.json")
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2)
+        
+        # Log to database
+        conn = get_db()
+        try:
+            with conn.cursor() as cursor:
+                # Get user ID - FIXED: use user_id column
+                cursor.execute("SELECT user_id FROM users WHERE username = %s", (current_user.get("username"),))
+                user_result = cursor.fetchone()
+                user_id = user_result["user_id"] if user_result else 1
+                
+                # Insert into files table
+                cursor.execute("""
+                    INSERT INTO files (file_name, file_type, uploaded_by, department, access_level, file_path, 
+                                     countries, departments, upload_time)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    file.filename,
+                    file_path.suffix.lstrip(".").lower(),
+                    user_id,
+                    ",".join(departments_list),
+                    "FILTERED",
+                    str(file_path),
+                    ",".join(countries_list),
+                    ",".join(departments_list),
+                    datetime.now()
+                ))
+                
+                # INSERT INTO upload_file_logs table
+                cursor.execute("""
+                    INSERT INTO upload_file_logs (user_id, username, filename)
+                    VALUES (%s, %s, %s)
+                """, (
+                    user_id,
+                    current_user.get("username"),
+                    file.filename
+                ))
+                
+                conn.commit()
+        finally:
+            conn.close()
+        
+        return {"message": "File uploaded successfully", "filename": file.filename}
+        
+    except Exception as e:
+        # Clean up files if DB insert fails
+        if file_path.exists():
+            file_path.unlink()
+        if 'meta_path' in locals() and meta_path.exists():
+            meta_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-    return {"message": f"File '{file.filename}' uploaded successfully."}
+@app.post("/batch-upload-files")
+async def batch_upload_files(
+    files: List[UploadFile] = File(...),
+    countries: str = Form(...),
+    departments: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    countries_list = json.loads(countries)
+    departments_list = json.loads(departments)
+    
+    uploaded_files = []
+    failed_files = []
+    
+    # Create a batch metadata file to signal the watcher
+    batch_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    batch_meta_path = UPLOAD_DIR / f".batch_upload_{batch_id}.processing"
+    
+    try:
+        # Create batch processing indicator
+        with open(batch_meta_path, "w") as f:
+            json.dump({
+                "batch_id": batch_id,
+                "total_files": len(files),
+                "status": "processing",
+                "started_at": datetime.now().isoformat()
+            }, f)
+        
+        # Upload all files with their metadata AND log to database one by one
+        for file in files:
+            try:
+                # Save the file
+                file_path = UPLOAD_DIR / file.filename
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                
+                # Save metadata as sidecar JSON file
+                meta = {
+                    "departments": departments_list,
+                    "countries": countries_list,
+                    "uploaded_by": current_user.get("username"),
+                    "batch_id": batch_id,
+                    "upload_time": datetime.now().isoformat()
+                }
+                meta_path = file_path.with_suffix(file_path.suffix + ".meta.json")
+                with open(meta_path, "w", encoding="utf-8") as f:
+                    json.dump(meta, f, indent=2)
+                
+                # Log to database (one by one, just like /upload-file)
+                conn = get_db()
+                try:
+                    with conn.cursor() as cursor:
+                        # Get user ID
+                        cursor.execute("SELECT user_id FROM users WHERE username = %s", (current_user.get("username"),))
+                        user_result = cursor.fetchone()
+                        user_id = user_result["user_id"] if user_result else 1
+                        
+                        # Insert into files table
+                        cursor.execute("""
+                            INSERT INTO files (file_name, file_type, uploaded_by, department, access_level, file_path, 
+                                             countries, departments, batch_id, upload_time)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            file.filename,
+                            file_path.suffix.lstrip(".").lower(),
+                            user_id,
+                            ",".join(departments_list),
+                            "FILTERED",
+                            str(file_path),
+                            ",".join(countries_list),
+                            ",".join(departments_list),
+                            batch_id,
+                            datetime.now()
+                        ))
+                        
+                        # INSERT INTO upload_file_logs table
+                        cursor.execute("""
+                            INSERT INTO upload_file_logs (user_id, username, filename)
+                            VALUES (%s, %s, %s)
+                        """, (
+                            user_id,
+                            current_user.get("username"),
+                            file.filename
+                        ))
+                        
+                        conn.commit()
+                finally:
+                    conn.close()
+                
+                uploaded_files.append(file.filename)
+                print(f"✅ File {file.filename} uploaded and logged to both tables")
+                
+            except Exception as e:
+                failed_files.append({"filename": file.filename, "error": str(e)})
+                print(f"❌ Failed to upload {file.filename}: {e}")
+                
+                # Clean up file if something goes wrong
+                if 'file_path' in locals() and file_path.exists():
+                    file_path.unlink()
+                if 'meta_path' in locals() and meta_path.exists():
+                    meta_path.unlink()
+        
+        # Update batch status to completed
+        with open(batch_meta_path, "w") as f:
+            json.dump({
+                "batch_id": batch_id,
+                "total_files": len(files),
+                "uploaded_files": len(uploaded_files),
+                "failed_files": len(failed_files),
+                "status": "completed",
+                "started_at": datetime.now().isoformat(),
+                "completed_at": datetime.now().isoformat()
+            }, f)
+        
+        # Rename to trigger watcher (remove .processing extension)
+        final_batch_path = UPLOAD_DIR / f".batch_upload_{batch_id}.json"
+        batch_meta_path.rename(final_batch_path)
+        
+        return {
+            "message": f"Batch upload completed. {len(uploaded_files)} files uploaded successfully.",
+            "uploaded_files": uploaded_files,
+            "failed_files": failed_files,
+            "batch_id": batch_id
+        }
+        
+    except Exception as e:
+        # Clean up on error
+        if batch_meta_path.exists():
+            batch_meta_path.unlink()
+        raise HTTPException(status_code=500, detail=f"Batch upload failed: {str(e)}")
 
 
 # Handl Logout
@@ -761,3 +1021,145 @@ def logout(token: str = Depends(oauth2_scheme)):
 #     StaticFiles(directory=r"C:\Users\txcjs\OneDrive\Documents\Homework\Yr 3.1\ICP\Presentation\frontend\dist", html=True),
 #     name="static"
 # )
+
+@app.post("/verify-admin-password")
+async def verify_admin_password(
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        # Get the user's stored password hash from database
+        conn = get_db()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT password_hash FROM users WHERE user_id = %s", (current_user["user_id"],))
+            user_record = cursor.fetchone()
+            
+            if not user_record:
+                raise HTTPException(status_code=404, detail="User not found")
+            # Hash the provided password and compare with stored hash
+            if verify_password(data.get("password"), user_record["password_hash"]):
+                return {"success": True}
+            else:
+                raise HTTPException(status_code=401, detail="Invalid password")
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Password verification failed: {str(e)}")
+    finally:
+        conn.close()
+
+# for speech-to-textAdd commentMore actions
+# change to medium or large for better performance only with GPU
+model = whisper.load_model("base")
+
+@app.post("/transcribe")
+async def transcribe(file: UploadFile = File(...)):
+    if not file:
+        return {"text": "No file uploaded."}
+
+    # Save uploaded file temporarily
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        # Load, process, and transcribe audio
+        audio = whisper.load_audio(tmp_path)
+        audio = whisper.pad_or_trim(audio)
+        mel = whisper.log_mel_spectrogram(audio).to(model.device)
+
+        # Detect language
+        _, probs = model.detect_language(mel)
+        detected_lang = max(probs, key=probs.get)
+        print(f"Detected language: {detected_lang}")
+
+        options = whisper.DecodingOptions(language=detected_lang)
+        result = whisper.decode(model, mel, options)
+
+        return {"text": result.text}
+    finally:
+        os.remove(tmp_path)
+
+# for chat search functionality
+@app.get("/search")
+def search_chats(q: str = ""):
+    connection = get_db()
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:  # <-- Use DictCursor here
+            if q.strip() == "":
+                # Return chats created in the last 30 days
+                thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+                sql = """
+                    SELECT log_id, query, response, created_at
+                    FROM chatbot_logs
+                    WHERE created_at >= %s
+                    ORDER BY created_at DESC
+                """
+                cursor.execute(sql, (thirty_days_ago,))
+            else:
+                # Split search query into words (and ignore very short/common words)
+                words = [word.lower() for word in q.strip().split() if len(word) >= 1]
+                if not words:
+                    return []
+
+                # Build dynamic WHERE clause: all words must be present
+                like_clauses = " AND ".join([
+                    "(LOWER(query) LIKE %s OR LOWER(response) LIKE %s)"
+                    for _ in words
+                ])
+                sql = f"""
+                    SELECT log_id, query, response, created_at
+                    FROM chatbot_logs
+                    WHERE {like_clauses}
+                    ORDER BY created_at DESC
+                    LIMIT 20
+                """
+                params = []
+                for word in words:
+                    wildcard = f"%{word}%"
+                    params.extend([wildcard, wildcard])  # one for query, one for response
+
+                cursor.execute(sql, params)
+
+            rows = cursor.fetchall()
+
+            results = [
+                {
+                    "log_id": row["log_id"],
+                    "query": row["query"],
+                    "response": row["response"],
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None
+                }
+                for row in rows
+            ]
+
+            return results
+    finally:
+        connection.close()
+
+# for chat search functionality
+@app.get("/chat-log/{log_id}")
+def get_chat_log(log_id: int):
+    connection = get_db()
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            sql = """
+                SELECT query, response
+                FROM chatbot_logs
+                WHERE log_id = %s
+            """
+            cursor.execute(sql, (log_id,))
+            rows = cursor.fetchall()
+
+            if not rows:
+                raise HTTPException(status_code=404, detail="Log not found")
+
+            messages = []
+            for row in rows:
+                messages.append({"role": "user", "content": row["query"]})
+                messages.append({"role": "assistant", "content": row["response"]})
+
+            return {"messages": messages}
+    finally:
+        connection.close()

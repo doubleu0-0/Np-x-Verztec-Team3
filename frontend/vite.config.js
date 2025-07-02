@@ -2,10 +2,11 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-// https://vitejs.dev/config/
 export default defineConfig({
   server: {
-    port: 3000,
+    host: '0.0.0.0',   // Accept connections from any IP (LAN)
+    port: 3000,         // Set preferred port
+    strictPort: true    // Do not fallback to random port
   },
   preview: {
     port: 3000,
@@ -16,4 +17,4 @@ export default defineConfig({
     },
   },
   plugins: [react()],
-})
+});

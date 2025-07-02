@@ -1,25 +1,346 @@
-const SearchPopup = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
+import { useState, useEffect, useRef } from "react"; // added useRef to detect clicks outside popup for closing it
+import axios from "axios";
+
+const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onChatSelect
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [typingTimeout, setTypingTimeout] = useState(null);
+  const [loading, setLoading] = useState(false); // 🔍 For spinner state while loading search results
+  const popupRef = useRef(null); // used to track popup container for detecting outside clicks
+  const firstMatchRef = useRef(null);
+
+  // Simple highlight function for user query text (returns html string)
+  const highlightQuery = (text, keyword) => {
+    if (!keyword.trim()) return text;
+    const words = keyword.trim().toLowerCase().split(/\s+/);
+    let highlighted = text;
+
+    words.forEach((word) => {
+      if (word.length > 0) {
+        // Escape regex special chars and do global case-insensitive replace
+        const regex = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi");
+        highlighted = highlighted.replace(regex, "<strong>$1</strong>");
+      }
+    });
+
+    return highlighted;
+  };
+
+  // Load recent chats when popup opens or when user clears search (query="")
+  useEffect(() => {
+    if (isOpen && query === "") {
+      fetchRecentChats();
+    }
+  }, [isOpen, query]);
+
+  // Added this useEffect to close popup when user clicks outside of it kinda expected UX nowadays i think?
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (event) => {
+      // If the click target is outside the popupRef element, close the popup
+      if (popupRef.current && !popupRef.current.contains(event.target)) {
+        onClose();
+      }
+    };
+    
+    // Listen globally for clicks
+    document.addEventListener("mousedown", handleClickOutside);
+    // Clean up the listener when popup closes or unmounts
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, onClose]);
+
+  // Fetch recent chats API call (for when no search query, just show latest chats)
+  const fetchRecentChats = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get("http://localhost:8000/search?q=");
+      setResults(res.data);
+    } catch (err) {
+      console.error("Failed to fetch recent chats:", err);
+    }
+    setLoading(false);
+  };
+
+  // Handle the actual search API call based on user's input query
+  const handleSearch = async (searchTerm) => {
+    if (!searchTerm.trim()) return; // no empty searches pls
+    setLoading(true);
+    try {
+      const res = await axios.get(`http://localhost:8000/search?q=${searchTerm}`);
+      setResults(res.data);
+
+      // Auto-scroll to first result if search query is at least 3 characters
+      if (searchTerm.trim().length >= 3 && res.data.length > 0) {
+        setTimeout(() => {
+          if (firstMatchRef.current) {
+            firstMatchRef.current.scrollIntoView({
+              behavior: "smooth",
+              block: "start"
+            });
+          }
+        }, 100); // Small delay so results can render first
+      }
+
+    } catch (err) {
+      console.error("Search failed:", err);
+    }
+    setLoading(false);
+  };
+
+  // Debounced input handler for search input box like for that automatic search-as-you-type experience
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setQuery(value);
+    if (typingTimeout) clearTimeout(typingTimeout);
+
+    // Wait 300ms after user stops typing before triggering search
+    const timeout = setTimeout(() => {
+      if (value.trim()) {
+        handleSearch(value);
+      }
+    }, 300);
+    setTypingTimeout(timeout);
+  };
+
+  // Clear input handler — resets query and reloads recent chats
+  const handleClearInput = () => {
+    setQuery("");
+    fetchRecentChats();
+  };
+
+  const handleChatClick = (logId) => {
+    if (onChatSelect) {
+      onChatSelect(logId);  // ✅ notify App about clicked chat
+    } else {
+      onClose();
+    }
+  };
+
+  const smartPreview = (text, keyword, fallbackWordLimit = 20) => {
+    if (!text) return "";
+
+    const [mainPart] = text.split("📄");
+    const allWords = mainPart.split(/\s+/);
+
+    const stopWords = new Set(["and", "or", "the", "a", "an", "of", "for", "in", "on", "at", "to", "with", "by"]);
+    const rawTerms = keyword.trim().toLowerCase().split(/\s+/);
+    const endsWithSpace = keyword.endsWith(" ");
+
+    const searchTerms = [];
+    const boldableTerms = [];
+
+    rawTerms.forEach((term, index) => {
+      if (!stopWords.has(term)) {
+        searchTerms.push(term);
+        if (term.length >= 3 || (endsWithSpace && index === rawTerms.length - 1)) {
+          boldableTerms.push(term);
+        }
+      }
+    });
+
+    if (searchTerms.length === 0) {
+      const preview = allWords.slice(0, fallbackWordLimit).join(" ");
+      return preview + (allWords.length > fallbackWordLimit ? "…" : "");
+    }
+
+    const sentences = mainPart.match(/[^.!?]+[.!?]*/g) || [];
+    const matches = [];
+
+    for (let i = 0; i < sentences.length; i++) {
+      if (matches.length >= 2) break;
+
+      const sentence = sentences[i];
+      const words = sentence.trim().split(/\s+/);
+
+      const containsAnySearchTerm = words.some(word => {
+        const cleaned = word.toLowerCase().replace(/[.,!?]/g, "");
+        return searchTerms.some(term => cleaned.includes(term));
+      });
+
+      if (containsAnySearchTerm) {
+        const highlighted = words.map(word => {
+          let original = word;
+          for (let term of boldableTerms) {
+            const lower = original.toLowerCase();
+            const clean = lower.replace(/[.,!?]/g, "");
+            const index = clean.indexOf(term);
+            if (index !== -1) {
+              const realIndex = lower.indexOf(term);
+              original =
+                original.slice(0, realIndex) +
+                "<strong>" +
+                original.slice(realIndex, realIndex + term.length) +
+                "</strong>" +
+                original.slice(realIndex + term.length);
+              break;
+            }
+          }
+          return original;
+        });
+
+        matches.push({
+          index: i,
+          sentence: highlighted.join(" ")
+        });
+      }
+    }
+
+    if (matches.length > 0) {
+      const firstIndex = matches[0].index;
+      const lastIndex = matches[matches.length - 1].index;
+
+      let fullSnippet = matches.map(m => m.sentence).join(" ");
+
+      // Add ellipses only if context is missing
+      if (firstIndex > 0) fullSnippet = "…" + fullSnippet;
+      if (lastIndex < sentences.length - 1) fullSnippet = fullSnippet + "…";
+
+      return fullSnippet;
+    }
+
+    const fallback = allWords.slice(0, fallbackWordLimit).join(" ");
+    return fallback + (allWords.length > fallbackWordLimit ? "…" : "");
+  };
+
+  // Format the datetime to show "Today", "Yesterday" or a proper date
+  const formatChatTime = (isoDate) => {
+    const now = new Date();
+    const chatDate = new Date(isoDate);
+
+    const isToday = chatDate.toDateString() === now.toDateString();
+
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = chatDate.toDateString() === yesterday.toDateString();
+
+    const timeString = chatDate.toLocaleTimeString("en-GB", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    if (isToday) return `Today, ${timeString}`;
+    if (isYesterday) return `Yesterday, ${timeString}`;
+
+    return chatDate.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+  };
+
+  if (!isOpen) return null; // Only show popup if open
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-lg w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      {/* Ref attached here so we can detect outside clicks for closing the popup */}
+      <div
+        ref={popupRef}
+        className="bg-gray-100 dark:bg-gray-800 p-6 rounded-2xl w-full max-w-2xl h-[600px] shadow-xl flex flex-col"
+      >
+        {/* Header with title and explicit close button (kept it cus its pretty standard for clarity and accessibility) */}
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Search Chats</h2>
-          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✕</button>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Search Chats</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xl"
+          >
+            ✕
+          </button>
         </div>
-        <input
-          type="text"
-          placeholder="Search your chats..."
-          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded mb-4 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-        />
-        <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Recent</p>
-          <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600">
-            <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded text-gray-900 dark:text-white">Chat A</div>
-            <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded text-gray-900 dark:text-white">Chat B</div>
-            {/* Replace with recent chats list */}
-          </div>
+
+        {/* Search input with a clear (✕) button to quickly reset */}
+        <div className="relative mb-4">
+          <input
+            type="text"
+            placeholder="Search your chats..."
+            value={query}
+            onChange={handleInputChange}
+            className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          />
+          {query && (
+            <button
+              onClick={handleClearInput}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Shows label based on if user has typed a query or not */}
+        <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+          {query ? "Results" : "Chats in the last 30 days"}
+        </div>
+
+        {/* The results list itself, scrollable with nice scrollbar styling */}
+        <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+          {results.map((chat, index) => {
+            if (!chat.query.trim()) return null;
+
+            const searchWordCount = query.trim().split(/\s+/).length;
+
+            if (searchWordCount > 4) {
+              // Show only the user question with highlighted search terms
+              const highlightedQuery = highlightQuery(chat.query, query);
+              if (!highlightedQuery.trim()) return null;
+
+              return (
+                <div
+                  key={chat.log_id}
+                  ref={index === 0 ? firstMatchRef : null}
+                  className="group cursor-pointer transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 p-3 rounded-lg text-gray-900 dark:text-white"
+                  onClick={() => handleChatClick(chat.log_id)}
+                >
+                  <p
+                    className="text-sm line-clamp-2"
+                    dangerouslySetInnerHTML={{ __html: highlightedQuery }}
+                  ></p>
+                  <small className="text-xs text-gray-600 dark:text-gray-300 block mt-1 opacity-0 group-hover:opacity-100 transition">
+                    {formatChatTime(chat.created_at)}
+                  </small>
+                </div>
+              );
+            } else {
+              // fallback to existing behaviour - show bot response with smartPreview
+              const html = smartPreview(chat.response, query);
+              if (!html.trim()) return null;
+
+              return (
+                <div
+                  key={chat.log_id}
+                  ref={index === 0 ? firstMatchRef : null}
+                  className="group cursor-pointer transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 p-3 rounded-lg text-gray-900 dark:text-white"
+                  onClick={() => handleChatClick(chat.log_id)}
+                >
+                  <p
+                    className="text-sm line-clamp-2"
+                    dangerouslySetInnerHTML={{ __html: html }}
+                  ></p>
+                  <small className="text-xs text-gray-600 dark:text-gray-300 block mt-1 opacity-0 group-hover:opacity-100 transition">
+                    {formatChatTime(chat.created_at)}
+                  </small>
+                </div>
+              );
+            }
+          })}
+          {/* Show no matches message if no results with previews */}
+          {!loading && results.filter(chat => {
+            const count = query.trim().split(/\s+/).length;
+            if (count >= 4) {
+              return chat.query.trim();
+            } else {
+              return smartPreview(chat.response, query).trim();
+            }
+          }).length === 0 && (
+            <p className="text-sm text-gray-400 dark:text-gray-500">No matches found.</p>
+          )}
         </div>
       </div>
     </div>

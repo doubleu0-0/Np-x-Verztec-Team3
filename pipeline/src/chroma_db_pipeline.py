@@ -18,7 +18,8 @@ MIT License
 Copyright (c) 2025 Tey Xue Cong, Tan Hong Kai, Siah Wan Ru Tricia, Tee Jia Yee
 See the LICENSE file in the project root for full license information.
 """
-
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*grpcio.*", module="opentelemetry.*")
 import io
 import json
 import unicodedata
@@ -36,6 +37,9 @@ import win32com.client
 from pathlib import Path
 from operator import itemgetter
 import chromadb
+from typing import List
+from typing import Union
+from sentence_transformers import SentenceTransformer
 from llama_index.core.schema import Document as llamadoc
 from llama_index.core import VectorStoreIndex, StorageContext
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -44,6 +48,8 @@ from llama_index.llms.ollama import Ollama
 from llama_index.core.node_parser import SimpleNodeParser
 from bs4 import BeautifulSoup, Tag, NavigableString
 from llama_index.vector_stores.chroma import ChromaVectorStore
+from llama_index.core.base.embeddings.base import BaseEmbedding
+
 
 # Use pathlib so it works on both Windows and Linux
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -54,7 +60,46 @@ PERSIST_DIR = PROJECT_ROOT / 'data' / 'ChromaDB'
 
 # This one is for embeding USER query
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2") # MUST BE SAME AS THE ONE USED FOR INDEXING
-embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
+# Load model locally
+model = SentenceTransformer("intfloat/e5-large-v2")
+
+# ChromaDB embedding function
+class HFChromaEmbedding:
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, input: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
+        if isinstance(input, str):
+            input = [f"passage: {input}"]
+            return self.model.encode(input, convert_to_numpy=True).tolist()[0]
+        else:
+            input = [f"passage: {text}" for text in input]
+            return self.model.encode(input, convert_to_numpy=True).tolist()
+
+    def name(self) -> str:
+        return "HFChromaEmbedding-e5-large-v2"
+
+chroma_embedding_fn = HFChromaEmbedding(model)
+
+# LlamaIndex embedding class
+class HFLlamaEmbedding(BaseEmbedding):
+    model: SentenceTransformer
+    def __init__(self, model):
+        super().__init__(model=model)
+
+    def _get_text_embedding(self, text: str) -> List[float]:
+        return self.model.encode(f"passage: {text}", convert_to_numpy=True).tolist()
+
+    def _get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
+        return self.model.encode([f"passage: {t}" for t in texts], convert_to_numpy=True).tolist()
+
+    def _get_query_embedding(self, query: str) -> List[float]:
+        return self.model.encode(f"query: {query}", convert_to_numpy=True).tolist()
+
+    async def _aget_query_embedding(self, query: str) -> List[float]:
+        return self._get_query_embedding(query)
+
+llama_embedding_fn = HFLlamaEmbedding(model)
 
 # The embedding model is chosen based on the Hugging Face MTEB leaderboard:
 # https://huggingface.co/spaces/mteb/leaderboard?benchmark_name=MTEB(Multilingual,+v2)
@@ -536,7 +581,7 @@ def split_into_documents(text, chunk_size=1000, chunk_overlap=200, title="Untitl
     )
 
     chunks = splitter.split_text(text)
-    print(f"Total chunks: {len(chunks)}\n")
+    print(f"Total chunks: {len(chunks)}\n", flush=True)
 
     documents = []
     for i, chunk in enumerate(chunks):
@@ -572,7 +617,7 @@ def build_or_append_index(documents,embed_model,persist_dir="pipeline/data/Embed
 
     # Initialize ChromaDB persistent client
     db = chromadb.PersistentClient(path=str(persist_dir))
-    chroma_collection = db.get_or_create_collection(collection_name)
+    chroma_collection = db.get_or_create_collection(collection_name, embedding_function=chroma_embedding_fn)
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     
@@ -580,24 +625,24 @@ def build_or_append_index(documents,embed_model,persist_dir="pipeline/data/Embed
     # Check if collection already has data
     existing_count = chroma_collection.count()
     if existing_count > 0:
-        print("Loading existing ChromaDB index...")
+        print("Loading existing ChromaDB index...", flush=True)
         index = VectorStoreIndex.from_vector_store(
             vector_store, storage_context=storage_context, embed_model=embed_model
         )
-        print("Total docs in index before append:", existing_count)
+        print("Total docs in index before append:", existing_count, flush=True)
         # Append new documents
         parser = SimpleNodeParser()
         nodes = parser.get_nodes_from_documents(documents)
         index.insert_nodes(nodes)
     else:
-        print("Creating new ChromaDB index...")
+        print("Creating new ChromaDB index...", flush=True)
         index = VectorStoreIndex.from_documents(
             documents, storage_context=storage_context, embed_model=embed_model
         )
 
     # ChromaDB persists automatically, but you can force a flush if needed
-    print("Saving new data...")
-    print("Total docs in index:", chroma_collection.count())
+    print("Saving new data...", flush=True)
+    print("Total docs in index:", chroma_collection.count(), flush=True)
 
     return index
 
@@ -654,13 +699,16 @@ def run_pipeline(raw_folder):
         if not filename.is_file():
             continue
         if filename.name in processed_files:
-            print(f'Skipping file: {filename.name}')
+            print(f'Skipping file: {filename.name}', flush=True)
             continue  # skip already processed files
         if filename.suffix == ".json" and filename.name.endswith(".meta.json"):
             print(f"Skipping metadata file: {filename.name}")
             continue  # skip metadata sidecar files
+        if filename.name.startswith(".batch_upload_") and filename.suffix == ".json":
+            print(f"Skipping batch tracking file: {filename.name}")
+            continue # skip batch tracking files
 
-        print(f"\nProcessing file: {filename.name}")
+        print(f"\nProcessing file: {filename.name}", flush=True)
         extracted_text = extract_text_from_file(str(filename))
 
         meta_path = filename.with_suffix(filename.suffix + ".meta.json")
@@ -681,7 +729,7 @@ def run_pipeline(raw_folder):
         countries=countries
     )
         
-        build_or_append_index(documents, embed_model, persist_dir=PERSIST_DIR, collection_name="quickstart")
+        build_or_append_index(documents, llama_embedding_fn, persist_dir=PERSIST_DIR, collection_name="quickstart")
         new_files.append(filename.name)
 
     # Update log file
@@ -689,7 +737,7 @@ def run_pipeline(raw_folder):
     with open(log_file_path, "w") as f:
         json.dump(list(processed_files), f, indent=2)
 
-    print("Pipeline completed. Database has been updated!")
+    print("Pipeline completed. Database has been updated!", flush=True)
 
 if __name__ == "__main__":
     run_pipeline(RAW_DATA)

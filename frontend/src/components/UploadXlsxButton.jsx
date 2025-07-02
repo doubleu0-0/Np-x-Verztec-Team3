@@ -108,6 +108,16 @@ export default function UploadXlsxButton() {
     );
   }
 
+  const filteredUploadResult = uploadResult
+    ? uploadResult.filter(
+        (row) =>
+          !(
+            row.status === 'error' &&
+            row.message === 'Missing required fields'
+          )
+      )
+    : null;
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4">
 
@@ -161,7 +171,7 @@ export default function UploadXlsxButton() {
       )}
 
       {/* Upload Result Table */}
-      {uploadResult && (
+      {filteredUploadResult && filteredUploadResult.length > 0 && (
         <div className="mt-6">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Upload Results</h3>
           <div className="overflow-x-auto">
@@ -175,7 +185,7 @@ export default function UploadXlsxButton() {
                 </tr>
               </thead>
               <tbody>
-                {uploadResult.map((row, idx) => (
+                {filteredUploadResult.map((row, idx) => (
                   <tr key={idx}>
                     <td className="px-2 py-1 border border-gray-300 dark:border-gray-700">{row.line}</td>
                     <td className="px-2 py-1 border border-gray-300 dark:border-gray-700">{row.username}</td>
@@ -194,45 +204,6 @@ export default function UploadXlsxButton() {
           </div>
         </div>
       )}
-
-      {/* Users Table */}
-      <h2 className="mt-10 mb-4 text-xl font-semibold text-gray-800 dark:text-gray-100">Users Table</h2>
-      <div className="overflow-x-auto border rounded border-gray-200 dark:border-gray-700">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-yellow-100 dark:bg-gray-800">
-            <tr>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300">User ID</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300">Username</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300">Email</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300">Department</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300">Role</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300">Country</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300">Last Updated</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {users.length > 0 ? (
-              users.map((user, index) => (
-                <tr key={user.user_id}>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{user.user_id}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{user.username}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{user.email}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{user.department}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{user.role}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{user.country}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{user.updated_at ? new Date(user.updated_at).toLocaleString() : ''}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={7} className="px-4 py-4 text-center text-gray-500 dark:text-gray-400">
-                  No users found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }

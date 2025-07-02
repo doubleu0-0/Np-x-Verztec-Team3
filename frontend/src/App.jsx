@@ -1,3 +1,4 @@
+// Updated App.jsx with TTSProvider integration and avatar selection
 import { useState, useEffect, useRef } from 'react';
 import Sidebar from '@/components/Sidebar';
 import SearchPopup from '@/components/SearchPopup';
@@ -13,6 +14,9 @@ import white_logo from '@/assets/images/logo-white.png';
 import ReactMarkdown from 'react-markdown';
 import FloatingWindow from "@/components/FloatingWindow";
 import GLBAvatar from '@/components/GLBAvatar';
+import { TTSProvider } from '@/contexts/TTSContext';
+import AdminConsole from '@/components/AdminConsole'; // IMPORT AdminConsole COMPONENT
+import AdminPasswordPrompt from '@/components/AdminPasswordPrompt'; // Add this import
 
 const models = [
   {
@@ -35,7 +39,7 @@ const models = [
   },
 ];
 
-function App() {
+function AppContent() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -46,7 +50,10 @@ function App() {
   const [view, setView] = useState('chat');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
-
+  const [selectedAvatar, setSelectedAvatar] = useState('avatar6'); // ADD THIS STATE
+  const [selectedLogId, setSelectedLogId] = useState(null); // NEW
+  const [adminPasswordVerified, setAdminPasswordVerified] = useState(false);
+  
   const modelDropdownRef = useRef(null);
 
   useEffect(() => {
@@ -98,7 +105,7 @@ function App() {
       headers: { Authorization: `Bearer ${token}` }
     });
     const profileData = await profileRes.json();
-    setUserProfile(profileData.session); // session contains role, country, department, etc.
+    setUserProfile(profileData.session);
     setIsLoggedIn(true);
   };
 
@@ -113,7 +120,6 @@ function App() {
           },
         });
       } catch (err) {
-        // Optionally handle error (e.g., network issues)
         console.error('Logout failed:', err);
       }
     }
@@ -122,8 +128,22 @@ function App() {
     setSelectedProfile(null);
   };
 
+  // ADD THIS FUNCTION
+  const handleAvatarChange = (avatarName) => {
+    setSelectedAvatar(avatarName);
+  };
+
+  const handleAdminConsole = () => {
+    setAdminPasswordVerified(false);
+    setView('adminConsole');
+  };
+
   const currentModel = models.find(m => m.name === selectedModel);
 
+  // Helper to know if we're in admin console or admin password prompt
+  const isAdminView = view === "adminConsole";
+
+  // Normal site for all other views
   if (!isLoggedIn) {
     return (
       <div
@@ -142,14 +162,13 @@ function App() {
 
       {/* Main Content */}
       <div className="flex flex-col flex-1">
-        {/* Title aligned top-left beside Sidebar */}
+        {/* Main header */}
         <div className="px-6 pt-4 pb-2 flex justify-between items-center">
           <img src={isDarkMode ? white_logo : logo} className="w-32" alt="logo" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
             Verztec's AI Assistant
           </h1>
         </div>
-
         {/* Header with Model Button, View Buttons (right), and ProfileDropdown */}
         <div className="flex justify-center w-full px-4">
           <div className="w-full max-w-5xl">
@@ -169,14 +188,15 @@ function App() {
                         style={{ fontSize: '0.7rem', marginLeft: 6 }}>
                         Beta
                       </span>
-                    )}
+                    )
+                    }
                     <svg className="ml-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
                   {showModelDropdown && (
                     <div className="absolute left-0 mt-4 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
-                      style={{ marginTop: '1.5rem' }} // Extra margin above dropdown
+                      style={{ marginTop: '1.5rem' }}
                     >
                       <ModelSelector
                         selectedModel={selectedModel}
@@ -190,7 +210,6 @@ function App() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {/* No buttons for the peasants */}
                 <div className="flex gap-2">
                   <button
                     onClick={() => setView('chat')}
@@ -200,28 +219,18 @@ function App() {
                   >
                     Chat
                   </button>
-                  {(userProfile?.role === 'ADMIN' || userProfile?.role === 'MANAGER') && (
-                    <>
-                      <button
-                        onClick={() => setView('uploadXlsx')}
-                        className={`px-3 py-1 text-sm rounded ${
-                          view === 'uploadXlsx' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
-                        }`}
-                      >
-                        Upload Excel
-                      </button>
-                      <button
-                        onClick={() => setView('uploadFile')}
-                        className={`px-3 py-1 text-sm rounded ${
-                          view === 'uploadFile' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
-                        }`}
-                      >
-                        Upload File
-                      </button>
-                    </>
+
+                  {(userProfile?.role === 'ADMIN') && (
+                    <button
+                      onClick={handleAdminConsole}
+                      className={`px-3 py-1 text-sm rounded ${
+                        view === 'adminConsole' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                      }`}
+                    >
+                      Admin Console
+                    </button>
                   )}
                 </div>
-                {/* Profile Dropdown */}
                 <ProfileDropdown
                   selectedProfile={selectedProfile}
                   setSelectedProfile={setSelectedProfile}
@@ -237,10 +246,14 @@ function App() {
         {/* Chat area container */}
         <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6 relative min-h-0">
           <div className="w-full max-w-5xl flex flex-col flex-1 min-h-0">
-            {/* Main View */}
             <main className="flex-1 min-h-0 flex flex-col">
               {view === 'chat' && (
-                <Chatbot userProfile={userProfile} selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+                <Chatbot 
+                  userProfile={userProfile}
+                  selectedModel={selectedModel}
+                  setSelectedModel={setSelectedModel}
+                  selectedLogId={selectedLogId} 
+                />
               )}
               {view === 'uploadXlsx' && <UploadXlsxButton />}
               {view === 'uploadFile' && <UploadFile />}
@@ -257,16 +270,55 @@ function App() {
                   </ReactMarkdown>
                 </div>
               )}
+              {view === "adminConsole" && (
+                !adminPasswordVerified ? (
+                  <div className="flex flex-1 items-center justify-center">
+                    <AdminPasswordPrompt
+                      onPasswordVerified={() => setAdminPasswordVerified(true)}
+                      onCancel={() => setView('chat')}
+                      isDarkMode={isDarkMode}
+                    />
+                  </div>
+                ) : (
+                  <AdminConsole
+                    userProfile={userProfile?.session}
+                    onBack={() => setView('chat')}
+                    isDarkMode={isDarkMode}
+                    toggleTheme={toggleTheme}
+                  />
+                )
+              )}
             </main>
           </div>
         </div>
 
         {/* Search Popup */}
-        <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-        {/*<GLBAvatar />*/}
-        <FloatingWindow />
+        <SearchPopup
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          onChatSelect={(logId) => {
+            setSelectedLogId(logId);
+            setIsSearchOpen(false);
+            setView("chat");
+          }}
+        />
+
+        {/* Avatar */}
+        <GLBAvatar 
+          selectedAvatar={selectedAvatar} 
+          onAvatarChange={handleAvatarChange} 
+        />
       </div>
     </div>
+  );
+}
+
+// Main App component wrapped with TTSProvider
+function App() {
+  return (
+    <TTSProvider>
+      <AppContent />
+    </TTSProvider>
   );
 }
 
