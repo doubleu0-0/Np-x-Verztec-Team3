@@ -50,7 +50,7 @@ function AppContent() {
   const [view, setView] = useState('chat');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
-  const [selectedAvatar, setSelectedAvatar] = useState('avatar6'); // ADD THIS STATE
+  const [selectedAvatar, setSelectedAvatar] = useState('avatar1'); // ADD THIS STATE
   const [selectedLogId, setSelectedLogId] = useState(null); // NEW
   const [adminPasswordVerified, setAdminPasswordVerified] = useState(false);
   
