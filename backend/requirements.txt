@@ -16,3 +16,6 @@ pydantic[email]
 python-multipart
 cryptography
 redis
+git+https://github.com/openai/whisper.git
+chromadb
+llama-index-vector-stores-chroma
