@@ -111,6 +111,8 @@ export default function UserManagement({ isDarkMode }) {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [menuOpen, setMenuOpen] = useState(null); // user_id of open menu
   const [editUser, setEditUser] = useState(null);
+  const [usersPerPage, setUsersPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchUsers();
@@ -176,6 +178,18 @@ export default function UserManagement({ isDarkMode }) {
         : String(bValue).localeCompare(String(aValue));
     });
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredAndSortedUsers.length / usersPerPage);
+  const paginatedUsers = filteredAndSortedUsers.slice(
+    (currentPage - 1) * usersPerPage,
+    currentPage * usersPerPage
+  );
+
+  // Reset to page 1 if usersPerPage changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [usersPerPage, searchTerm]);
+
   const handleMenuOpen = (userId) => {
     setMenuOpen(menuOpen === userId ? null : userId);
   };
@@ -234,10 +248,8 @@ export default function UserManagement({ isDarkMode }) {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">User Management</h3>
-        {/* Only Search Bar */}
+    <div className="pt-4 pb-2">
+      <div className="mb-4">
         <div className="flex gap-4 mb-4 items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -249,77 +261,69 @@ export default function UserManagement({ isDarkMode }) {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white"
             />
           </div>
+          {/* Users per page selector */}
+          <div>
+            <select
+              value={usersPerPage}
+              onChange={e => setUsersPerPage(Number(e.target.value))}
+              className="pl-3 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-base font-medium"
+              style={{ minWidth: 120 }}
+            >
+              {[5, 10, 20, 50, 100].map(n => (
+                <option key={n} value={n}>{n} per page</option>
+              ))}
+            </select>
+          </div>
         </div>
         {/* Results Summary */}
         <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-          Showing {filteredAndSortedUsers.length} of {users.length} users
+          Showing {paginatedUsers.length} of {filteredAndSortedUsers.length} users
         </div>
       </div>
 
       {/* Users Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden ml-0">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                  onClick={() => handleSort('user_id')}
-                >
-                  <div className="flex items-center gap-1">
-                    ID
-                    {getSortIcon('user_id')}
-                  </div>
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                  onClick={() => handleSort('username')}
-                >
+                <th className="px-6 py-3 w-40 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('username')}>
                   <div className="flex items-center gap-1">
                     Username
                     {getSortIcon('username')}
                   </div>
                 </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                  onClick={() => handleSort('email')}
-                >
+                <th className="px-6 py-3 w-56 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('email')}>
                   <div className="flex items-center gap-1">
                     Email
                     {getSortIcon('email')}
                   </div>
                 </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                  onClick={() => handleSort('role')}
-                >
+                <th className="px-6 py-3 w-28 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('role')}>
                   <div className="flex items-center gap-1">
                     Role
                     {getSortIcon('role')}
                   </div>
                 </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                  onClick={() => handleSort('department')}
-                >
+                <th className="px-6 py-3 w-40 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('department')}>
                   <div className="flex items-center gap-1">
                     Department
                     {getSortIcon('department')}
                   </div>
                 </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                  onClick={() => handleSort('country')}
-                >
+                <th className="px-6 py-3 w-40 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('country')}>
                   <div className="flex items-center gap-1">
                     Country
                     {getSortIcon('country')}
                   </div>
                 </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                  onClick={() => handleSort('updated_at')}
-                >
+                <th className="px-6 py-3 w-28 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('updated_at')}>
                   <div className="flex items-center gap-1">
                     Updated
                     {getSortIcon('updated_at')}
@@ -329,20 +333,17 @@ export default function UserManagement({ isDarkMode }) {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredAndSortedUsers.map((user) => (
+              {paginatedUsers.map((user) => (
                 <tr key={user.user_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900 dark:text-white">{user.user_id}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 w-40 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.username}>
                     <span className="text-sm font-medium text-gray-900 dark:text-white">{user.username}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 w-56 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.email}>
                     <div className="text-sm text-gray-900 dark:text-white">
                       {user.email}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 w-28 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.role}>
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                       user.role === 'ADMIN'
                         ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
@@ -353,22 +354,22 @@ export default function UserManagement({ isDarkMode }) {
                       {user.role}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 w-40 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.department}>
                     <div className="text-sm text-gray-900 dark:text-white">
                       {user.department}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 w-40 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.country}>
                     <div className="text-sm text-gray-900 dark:text-white">
                       {user.country}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 w-28 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A'}>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       {user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A'}
                     </div>
                   </td>
-                  <td className="w-10 px-1 py-4 relative">
+                  <td className="w-10 px-1 py-4 relative" style={{ minWidth: 40 }}>
                     <button
                       className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                       onClick={() => handleMenuOpen(user.user_id)}
@@ -376,15 +377,15 @@ export default function UserManagement({ isDarkMode }) {
                       <MoreVertical className="w-5 h-5" />
                     </button>
                     {menuOpen === user.user_id && (
-                      <div className="absolute right-0 mt-2 w-28 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg z-10">
+                      <div className="absolute right-0 mt-2 w-28 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-10">
                         <button
-                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-xl"
                           onClick={() => handleEdit(user)}
                         >
                           Edit
                         </button>
                         <button
-                          className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-xl"
                           onClick={() => handleDelete(user)}
                         >
                           Delete
@@ -396,6 +397,26 @@ export default function UserManagement({ isDarkMode }) {
               ))}
             </tbody>
           </table>
+        </div>
+        {/* Pagination controls */}
+        <div className="flex justify-end items-center gap-1 px-2 py-0 pb-2 text-xs">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 text-xs"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-gray-700 dark:text-gray-300">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 text-xs"
+          >
+            Next
+          </button>
         </div>
         {filteredAndSortedUsers.length === 0 && (
           <div className="text-center py-8">

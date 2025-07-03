@@ -264,7 +264,7 @@ export default function UploadFile() {
       : ['ALL', user.department];
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4">
+    <div className="w-full">
       <div className="relative bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-8 mb-10">
         
         {/* Upload Mode Toggle */}
@@ -432,21 +432,35 @@ export default function UploadFile() {
             >
               <Building className="w-4 h-4" /> All Departments
             </button>
-            <button
-              type="button"
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border transition ${
-                selectedDepartment !== 'ALL'
-                  ? 'bg-yellow-500 text-white border-yellow-500'
-                  : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200'
-              }`}
-              onClick={() => setShowDepartmentDropdown((v) => !v)}
-            >
-              <Users className="w-4 h-4" /> {selectedDepartment !== 'ALL' && selectedDepartment ? selectedDepartment : 'Select a Department'}
-              <span className="ml-1">{showDepartmentDropdown ? '▲' : '▼'}</span>
-            </button>
+            {user.role === 'ADMIN' ? (
+              <button
+                type="button"
+                className={`flex items-center gap-2 px-4 py-2 rounded-full border transition ${
+                  selectedDepartment !== 'ALL'
+                    ? 'bg-yellow-500 text-white border-yellow-500'
+                    : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200'
+                }`}
+                onClick={() => setShowDepartmentDropdown((v) => !v)}
+              >
+                <Users className="w-4 h-4" /> {selectedDepartment !== 'ALL' && selectedDepartment ? selectedDepartment : 'Select a Department'}
+                <span className="ml-1">{showDepartmentDropdown ? '▲' : '▼'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={`flex items-center gap-2 px-4 py-2 rounded-full border transition ${
+                  selectedDepartment === user.department
+                    ? 'bg-yellow-500 text-white border-yellow-500'
+                    : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200'
+                }`}
+                onClick={() => setSelectedDepartment(user.department)}
+              >
+                <Users className="w-4 h-4" /> {user.department}
+              </button>
+            )}
           </div>
-          {/* Collapsible dropdown for both admin and manager */}
-          {showDepartmentDropdown && (
+          {/* Dropdown for admin only */}
+          {showDepartmentDropdown && user.role === 'ADMIN' && (
             <div className="mt-2 animate-fade-in">
               <select
                 className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"

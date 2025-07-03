@@ -16,7 +16,7 @@ const AdminSidebar = ({ activeTab, setActiveTab, isDarkMode }) => {
   ];
 
   return (
-    <div className="w-64 h-screen fixed left-0 top-0 bg-gray-100 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+    <div style={{ width: '256px' }} className="h-screen fixed left-0 top-0 bg-gray-100 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Admin Console</h2>
       </div>
@@ -68,8 +68,13 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
   const renderContent = () => {
     switch (activeTab) {
       case 'users':
-        return <UserManagement isDarkMode={isDarkMode} />;
-      
+        return (
+          <div className="p-6">
+            <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">User Management</h3>
+            <UserManagement />
+          </div>
+        );
+
       case 'addUser':
         return (
           <div className="p-6">
@@ -80,9 +85,12 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
       
       case 'policies':
         return (
-          <PolicyDocuments />
+          <div className="p-6">
+            <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Policy Documents</h3>
+            <PolicyDocuments />
+          </div>
         );
-      
+
       case 'documents':
         return (
           <div className="p-6">
@@ -98,15 +106,13 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Sidebar */}
       <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} isDarkMode={isDarkMode} />
-      {/* Main content area */}
-      <div className="ml-64">
+      <div style={{ marginLeft: '256px' }}>
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+        <header className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 py-4 pl-0 pr-0">
           <div className="flex items-center justify-between">
             {/* Left side - Logo and current page title */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 pl-6">
               <img src={isDarkMode ? white_logo : logo} className="w-24" alt="logo" />
               <div className="flex items-center gap-3">
                 <button
@@ -127,7 +133,7 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
             </div>
             
             {/* Right side - User info and controls */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 pr-6">
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 <span className="font-medium">{userProfile?.username}</span>
                 <span className="ml-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded text-xs font-semibold">
@@ -153,10 +159,7 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
           </div>
         </header>
         {/* Main content area with scroll */}
-        <main
-          className="h-[calc(100vh-72px)] overflow-y-auto bg-gray-50 dark:bg-gray-900 px-0"
-          // 72px = header height (adjust if your header is taller/shorter)
-        >
+        <main className="h-[calc(100vh-72px)] overflow-y-auto bg-gray-50 dark:bg-gray-900 px-2">
           {renderContent()}
         </main>
       </div>

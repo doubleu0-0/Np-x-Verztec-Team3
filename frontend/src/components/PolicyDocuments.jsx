@@ -1,86 +1,436 @@
 import { useState, useEffect } from 'react';
-import { Search, Trash2 } from 'lucide-react';
 import axios from 'axios';
+import { ChevronUp, ChevronDown, MoreVertical, X, Filter } from 'lucide-react';
+
+const ALL_DEPARTMENTS = [
+  "Marketing","Procurement","IT","Project Management","Human Resource","Admin & Operations","Business Development","Finance","Service Delivery"
+];
+const ALL_COUNTRIES = [
+  "Singapore","Japan","Vietnam","United Kingdom","Myanmar","United States","Indonesia","Thailand","Korea","China"
+];
+
+function isAll(list, allList) {
+  if (!list) return false;
+  if (typeof list === "string") list = list.split(",");
+  return list.length === allList.length;
+}
 
 export default function PolicyDocuments() {
   const [fileList, setFileList] = useState([]);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [docsPerPage, setDocsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [menuOpen, setMenuOpen] = useState(null);
+  const [editFile, setEditFile] = useState(null);
+  const [departmentFilter, setDepartmentFilter] = useState('ALL');
+  const [countryFilter, setCountryFilter] = useState('ALL');
+  const [showFilterPopup, setShowFilterPopup] = useState(false);
+  const [selectedDepartments, setSelectedDepartments] = useState([]);
+  const [selectedCountries, setSelectedCountries] = useState([]);
 
   useEffect(() => {
     fetchFileList();
   }, []);
 
   const fetchFileList = async () => {
+    setLoading(true);
     const token = localStorage.getItem('token');
     try {
-      const res = await axios.get('http://localhost:8000/list-files', {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await axios.get('http://localhost:8000/files', {
+        headers: { Authorization: `Bearer ${token}` }
       });
       setFileList(res.data);
-    } catch (err) {
-      setStatus('Failed to load file list');
+    } catch {
+      setFileList([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (filename) => {
-    if (!window.confirm(`Delete "${filename}"?`)) return;
-    const token = localStorage.getItem('token');
-    try {
-      await axios.delete(`http://localhost:8000/delete-file/${filename}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setStatus(`Deleted "${filename}"`);
-      await fetchFileList();
-    } catch (err) {
-      setStatus('Delete failed: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
-  // Filter files (excluding .txt and .json)
+  // Filtering
   const filteredFiles = fileList
-    .filter(filename => !filename.endsWith('.txt') && !filename.endsWith('.json'))
-    .filter(filename => filename.toLowerCase().includes(search.toLowerCase()));
+    .filter(file => !file.file_name?.toLowerCase().endsWith('.txt'))
+    .filter(file =>
+      file.file_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      file.uploaded_by?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (file.departments && file.departments.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (file.countries && file.countries.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
+    .filter(file => {
+      // Department filter
+      if (departmentFilter === 'ALL') return true;
+      if (!file.departments) return false;
+      const depts = typeof file.departments === 'string' ? file.departments.split(',').map(d => d.trim()) : file.departments;
+      return depts.includes(departmentFilter);
+    })
+    .filter(file => {
+      // Country filter
+      if (countryFilter === 'ALL') return true;
+      if (!file.countries) return false;
+      const countries = typeof file.countries === 'string' ? file.countries.split(',').map(c => c.trim()) : file.countries;
+      return countries.includes(countryFilter);
+    })
+    .filter(file => {
+      // Department multi-select filter
+      if (!selectedDepartments.length) return true;
+      if (!file.departments) return false;
+      const depts = typeof file.departments === 'string' ? file.departments.split(',').map(d => d.trim()) : file.departments;
+      return selectedDepartments.some(dept => depts.includes(dept));
+    })
+    .filter(file => {
+      // Country multi-select filter
+      if (!selectedCountries.length) return true;
+      if (!file.countries) return false;
+      const countries = typeof file.countries === 'string' ? file.countries.split(',').map(c => c.trim()) : file.countries;
+      return selectedCountries.some(country => countries.includes(country));
+    });
+
+  // Sorting
+  const sortedFiles = [...filteredFiles].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    const aValue = a[sortConfig.key] || '';
+    const bValue = b[sortConfig.key] || '';
+    return sortConfig.direction === 'asc'
+      ? String(aValue).localeCompare(String(bValue))
+      : String(bValue).localeCompare(String(aValue));
+  });
+
+  const totalPages = Math.ceil(sortedFiles.length / docsPerPage);
+  const paginatedFiles = sortedFiles.slice(
+    (currentPage - 1) * docsPerPage,
+    currentPage * docsPerPage
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [docsPerPage, searchTerm]);
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) {
+      return <ChevronUp className="w-4 h-4 text-gray-400" />;
+    }
+    return sortConfig.direction === 'asc'
+      ? <ChevronUp className="w-4 h-4 text-yellow-600" />
+      : <ChevronDown className="w-4 h-4 text-yellow-600" />;
+  };
+
+  const handleMenuOpen = (fileId) => {
+    setMenuOpen(menuOpen === fileId ? null : fileId);
+  };
+
+  const handleEdit = (file) => {
+    setMenuOpen(null);
+    setEditFile(file);
+  };
+
+  const handleDelete = (file) => {
+    setMenuOpen(null);
+    alert(`Delete file: ${file.file_name}`);
+  };
+
+  const closeEditModal = () => setEditFile(null);
 
   return (
-    <div className="p-6">
-      <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Policy Documents</h3>
-      <div className="flex gap-4 mb-4 items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+    <div className="pt-4 pb-2">
+      <div className="mb-4">
+        <div className="flex gap-4 mb-4 items-center">
           <input
             type="text"
-            placeholder="Search files..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white"
+            placeholder="Search by file name, department, country, or uploader..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full pl-3 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white"
           />
+          <div>
+            <select
+              value={docsPerPage}
+              onChange={e => setDocsPerPage(Number(e.target.value))}
+              className="pl-3 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-base font-medium h-[44px]"
+              style={{ minWidth: 120 }}
+            >
+              {[5, 10, 20, 50, 100].map(n => (
+                <option key={n} value={n}>{n} per page</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center justify-center h-[44px]"
+            onClick={() => setShowFilterPopup(true)}
+            title="Filter"
+            style={{ minWidth: 44 }}
+          >
+            <Filter className="w-5 h-5 text-gray-500 dark:text-gray-300" />
+          </button>
         </div>
       </div>
-      {status && (
-        <div className="mb-4 text-sm px-4 py-2 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
-          {status}
+      {/* Results Summary */}
+      <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+        Showing {paginatedFiles.length} of {filteredFiles.length} documents
+      </div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th
+                className="px-6 py-3 w-72 max-w-xs text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                onClick={() => handleSort('file_name')}
+              >
+                <div className="flex items-center gap-1">
+                  File Name
+                  {getSortIcon('file_name')}
+                </div>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                onClick={() => handleSort('departments')}
+              >
+                <div className="flex items-center gap-1">
+                  Departments
+                  {getSortIcon('departments')}
+                </div>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                onClick={() => handleSort('countries')}
+              >
+                <div className="flex items-center gap-1">
+                  Countries
+                  {getSortIcon('countries')}
+                </div>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                onClick={() => handleSort('uploaded_by')}
+              >
+                <div className="flex items-center gap-1">
+                  Uploaded By
+                  {getSortIcon('uploaded_by')}
+                </div>
+              </th>
+              <th className="w-10 px-1 py-3"></th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {loading ? (
+              <tr>
+                <td colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">Loading files...</td>
+              </tr>
+            ) : paginatedFiles.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">No files found.</td>
+              </tr>
+            ) : (
+              paginatedFiles.map((file, idx) => {
+                const departments = typeof file.departments === "string" ? file.departments.split(",") : file.departments;
+                const countries = typeof file.countries === "string" ? file.countries.split(",") : file.countries;
+                return (
+                  <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700 relative">
+                    <td className="px-6 py-4 w-72 max-w-xs whitespace-nowrap overflow-hidden text-ellipsis text-gray-900 dark:text-white" title={file.file_name}>
+                      {file.file_name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
+                      {isAll(departments, ALL_DEPARTMENTS) ? "ALL" : departments.join(", ")}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
+                      {isAll(countries, ALL_COUNTRIES) ? "ALL" : countries.join(", ")}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
+                      {file.uploaded_by}
+                    </td>
+                    <td className="w-10 px-1 py-4 relative">
+                      <button
+                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                        onClick={() => handleMenuOpen(file.file_id)}
+                      >
+                        <MoreVertical className="w-5 h-5" />
+                      </button>
+                      {menuOpen === file.file_id && (
+                        <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-20">
+                          <button
+                            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-xl"
+                            onClick={() => handleEdit(file)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-xl"
+                            onClick={() => handleDelete(file)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+        {/* Pagination controls inside the border */}
+        <div className="flex justify-end items-center gap-1 px-2 py-0 pb-2 text-xs">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 text-xs"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-gray-700 dark:text-gray-300">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 text-xs"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
+      {/* Edit File Modal */}
+      {editFile && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md relative">
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={closeEditModal}
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Edit File</h2>
+            <div className="mb-4">
+              <div className="text-sm text-gray-700 dark:text-gray-200 mb-2">
+                <strong>File Name:</strong> {editFile.file_name}
+              </div>
+              {/* Add more editable fields as needed */}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                onClick={closeEditModal}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-yellow-500 hover:bg-yellow-600 text-white font-semibold"
+                onClick={closeEditModal}
+              >
+                Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
-      {filteredFiles.length > 0 ? (
-        <ul className="space-y-2">
-          {filteredFiles.map((filename, idx) => (
-            <li
-              key={idx}
-              className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded shadow-sm border border-gray-200 dark:border-gray-700"
+
+      {/* Filter Popup */}
+      {showFilterPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-sm relative">
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={() => setShowFilterPopup(false)}
             >
-              <span className="text-gray-800 dark:text-gray-100">{filename}</span>
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Filter Documents</h2>
+            <div className="mb-4">
+              <label className="block font-medium mb-1 text-gray-900 dark:text-gray-100">Departments</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                <button
+                  type="button"
+                  className={`px-3 py-1 rounded-full border text-sm ${
+                    selectedDepartments.length === 0
+                      ? 'bg-yellow-500 text-white border-yellow-500'
+                      : 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200'
+                  }`}
+                  onClick={() => setSelectedDepartments([])}
+                >
+                  All
+                </button>
+                {ALL_DEPARTMENTS.map(dept => (
+                  <button
+                    key={dept}
+                    type="button"
+                    className={`px-3 py-1 rounded-full border text-sm ${
+                      selectedDepartments.includes(dept)
+                        ? 'bg-yellow-500 text-white border-yellow-500'
+                        : 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200'
+                    }`}
+                    onClick={() => setSelectedDepartments(selectedDepartments.includes(dept)
+                      ? selectedDepartments.filter(d => d !== dept)
+                      : [...selectedDepartments, dept]
+                    )}
+                  >
+                    {dept}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block font-medium mb-1 text-gray-900 dark:text-gray-100">Countries</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                <button
+                  type="button"
+                  className={`px-3 py-1 rounded-full border text-sm ${
+                    selectedCountries.length === 0
+                      ? 'bg-yellow-500 text-white border-yellow-500'
+                      : 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200'
+                  }`}
+                  onClick={() => setSelectedCountries([])}
+                >
+                  All
+                </button>
+                {ALL_COUNTRIES.map(country => (
+                  <button
+                    key={country}
+                    type="button"
+                    className={`px-3 py-1 rounded-full border text-sm ${
+                      selectedCountries.includes(country)
+                        ? 'bg-yellow-500 text-white border-yellow-500'
+                        : 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200'
+                    }`}
+                    onClick={() => setSelectedCountries(selectedCountries.includes(country)
+                      ? selectedCountries.filter(c => c !== country)
+                      : [...selectedCountries, country]
+                    )}
+                  >
+                    {country}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
               <button
-                onClick={() => handleDelete(filename)}
-                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm flex items-center gap-1"
+                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                onClick={() => {
+                  setSelectedDepartments([]);
+                  setSelectedCountries([]);
+                }}
               >
-                <Trash2 className="w-4 h-4" /> Delete
+                Clear
               </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-gray-500 dark:text-gray-400">No files found. Upload a file to get started.</p>
+              <button
+                className="px-4 py-2 rounded bg-yellow-500 hover:bg-yellow-600 text-white font-semibold"
+                onClick={() => setShowFilterPopup(false)}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

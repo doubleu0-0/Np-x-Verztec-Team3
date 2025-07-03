@@ -157,121 +157,134 @@ function AppContent() {
 
   return (
     <div className={`flex h-screen overflow-hidden ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'}`}>
-      {/* Sidebar */}
-      <Sidebar onNewChat={handleNewChat} onSearch={handleSearch} />
+      {/* Sidebar - only show when NOT in verified admin console */}
+      {!(view === "adminConsole" && adminPasswordVerified) && (
+        <Sidebar onNewChat={handleNewChat} onSearch={handleSearch} />
+      )}
 
       {/* Main Content */}
       <div className="flex flex-col flex-1">
-        {/* Main header */}
-        <div className="px-6 pt-4 pb-2 flex justify-between items-center">
-          <img src={isDarkMode ? white_logo : logo} className="w-32" alt="logo" />
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
-            Verztec's AI Assistant
-          </h1>
-        </div>
-        {/* Header with Model Button, View Buttons (right), and ProfileDropdown */}
-        <div className="flex justify-center w-full px-4">
-          <div className="w-full max-w-5xl">
-            <header className="flex justify-between items-center mb-2 border-b border-gray-200 dark:border-gray-700 rounded-lg px-4 py-1 z-30">
-              <div className="flex items-center gap-2">
-                {/* Model Button - now left aligned */}
-                <div className="relative" ref={modelDropdownRef}>
-                  <button
-                    onClick={() => setShowModelDropdown(v => !v)}
-                    className={`flex items-center px-3 py-1 text-sm rounded border font-semibold shadow transition
-                      ${showModelDropdown ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-400'}
-                    `}
-                  >
-                    <span className="font-semibold text-gray-900 dark:text-white">{currentModel.label}</span>
-                    {currentModel.beta && (
-                      <span className="ml-2 px-2 py-0.5 text-xs font-bold rounded bg-yellow-400 text-yellow-900"
-                        style={{ fontSize: '0.7rem', marginLeft: 6 }}>
-                        Beta
-                      </span>
-                    )
-                    }
-                    <svg className="ml-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  {showModelDropdown && (
-                    <div className="absolute left-0 mt-4 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
-                      style={{ marginTop: '1.5rem' }}
-                    >
-                      <ModelSelector
-                        selectedModel={selectedModel}
-                        setSelectedModel={(name) => {
-                          setSelectedModel(name);
-                          setShowModelDropdown(false);
-                        }}
-                      />
+        {/* Only show main header and profile/model bar if NOT in admin console */}
+        {!(view === "adminConsole" && adminPasswordVerified) && (
+          <>
+            <div className="px-6 pt-4 pb-2 flex justify-between items-center">
+              <img src={isDarkMode ? white_logo : logo} className="w-32" alt="logo" />
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
+                Verztec's AI Assistant
+              </h1>
+            </div>
+            <div className="flex justify-center w-full px-4">
+              <div className="w-full max-w-5xl">
+                <header className="flex justify-between items-center mb-2 border-b border-gray-200 dark:border-gray-700 rounded-lg px-4 py-1 z-30">
+                  <div className="flex items-center gap-2">
+                    {/* Model Button - now left aligned */}
+                    <div className="relative" ref={modelDropdownRef}>
+                      <button
+                        onClick={() => setShowModelDropdown(v => !v)}
+                        className={`flex items-center px-3 py-1 text-sm rounded border font-semibold shadow transition
+                          ${showModelDropdown ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-400'}
+                        `}
+                      >
+                        <span className="font-semibold text-gray-900 dark:text-white">{currentModel.label}</span>
+                        {currentModel.beta && (
+                          <span className="ml-2 px-2 py-0.5 text-xs font-bold rounded bg-yellow-400 text-yellow-900"
+                            style={{ fontSize: '0.7rem', marginLeft: 6 }}>
+                            Beta
+                          </span>
+                        )
+                        }
+                        <svg className="ml-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {showModelDropdown && (
+                        <div className="absolute left-0 mt-4 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
+                          style={{ marginTop: '1.5rem' }}
+                        >
+                          <ModelSelector
+                            selectedModel={selectedModel}
+                            setSelectedModel={(name) => {
+                              setSelectedModel(name);
+                              setShowModelDropdown(false);
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setView('chat')}
-                    className={`px-3 py-1 text-sm rounded ${
-                      view === 'chat' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
-                    }`}
-                  >
-                    Chat
-                  </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setView('chat')}
+                        className={`px-3 py-1 text-sm rounded ${
+                          view === 'chat' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                        }`}
+                      >
+                        Chat
+                      </button>
 
-                  {(userProfile?.role === 'ADMIN') && (
-                    <button
-                      onClick={handleAdminConsole}
-                      className={`px-3 py-1 text-sm rounded ${
-                        view === 'adminConsole' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
-                      }`}
-                    >
-                      Admin Console
-                    </button>
-                  )}
-                </div>
-                <ProfileDropdown
-                  selectedProfile={selectedProfile}
-                  setSelectedProfile={setSelectedProfile}
-                  theme={isDarkMode ? 'dark' : 'light'}
-                  toggleTheme={toggleTheme}
-                  onLogout={handleLogout}
-                />
+                      {(userProfile?.role === 'ADMIN' || userProfile?.role === 'MANAGER') && (
+                        <button
+                          onClick={handleAdminConsole}
+                          className={`px-3 py-1 text-sm rounded ${
+                            view === 'adminConsole' ? 'bg-yellow-500 text-black font-semibold' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                          }`}
+                        >
+                          Admin Console
+                        </button>
+                      )}
+                    </div>
+                    <ProfileDropdown
+                      selectedProfile={selectedProfile}
+                      setSelectedProfile={setSelectedProfile}
+                      theme={isDarkMode ? 'dark' : 'light'}
+                      toggleTheme={toggleTheme}
+                      onLogout={handleLogout}
+                    />
+                  </div>
+                </header>
               </div>
-            </header>
-          </div>
-        </div>
+            </div>
+          </>
+        )}
 
         {/* Chat area container */}
-        <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6 relative min-h-0">
-          <div className="w-full max-w-5xl flex flex-col flex-1 min-h-0">
-            <main className="flex-1 min-h-0 flex flex-col">
-              {view === 'chat' && (
-                <Chatbot 
-                  userProfile={userProfile}
-                  selectedModel={selectedModel}
-                  setSelectedModel={setSelectedModel}
-                  selectedLogId={selectedLogId} 
-                />
-              )}
-              {view === 'uploadXlsx' && <UploadXlsxButton />}
-              {view === 'uploadFile' && <UploadFile />}
-              {view === 'markdown' && (
-                <div className="prose max-w-full">
-                  <ReactMarkdown
-                    components={{
-                      a: (props) => (
-                        <a {...props} target="_blank" rel="noopener noreferrer" />
-                      )
-                    }}
-                  >
-                    {markdownContent}
-                  </ReactMarkdown>
-                </div>
-              )}
-              {view === "adminConsole" && (
-                !adminPasswordVerified ? (
+        {view === "adminConsole" && adminPasswordVerified ? (
+          // Full width for AdminConsole, no centering or max-width constraints
+          <AdminConsole
+            userProfile={userProfile}
+            onBack={() => setView('chat')}
+            isDarkMode={isDarkMode}
+            toggleTheme={toggleTheme}
+          />
+        ) : (
+          <div className="flex justify-center flex-1 overflow-y-auto px-4 pb-6 relative min-h-0">
+            <div className="w-full max-w-5xl flex flex-col flex-1 min-h-0">
+              <main className="flex-1 min-h-0 flex flex-col">
+                {view === 'chat' && (
+                  <Chatbot 
+                    userProfile={userProfile}
+                    selectedModel={selectedModel}
+                    setSelectedModel={setSelectedModel}
+                    selectedLogId={selectedLogId} 
+                  />
+                )}
+                {view === 'uploadXlsx' && <UploadXlsxButton />}
+                {view === 'uploadFile' && <UploadFile />}
+                {view === 'markdown' && (
+                  <div className="prose max-w-full">
+                    <ReactMarkdown
+                      components={{
+                        a: (props) => (
+                          <a {...props} target="_blank" rel="noopener noreferrer" />
+                        )
+                      }}
+                    >
+                      {markdownContent}
+                    </ReactMarkdown>
+                  </div>
+                )}
+                {view === "adminConsole" && !adminPasswordVerified && (
                   <div className="flex flex-1 items-center justify-center">
                     <AdminPasswordPrompt
                       onPasswordVerified={() => setAdminPasswordVerified(true)}
@@ -279,18 +292,11 @@ function AppContent() {
                       isDarkMode={isDarkMode}
                     />
                   </div>
-                ) : (
-                  <AdminConsole
-                    userProfile={userProfile?.session}
-                    onBack={() => setView('chat')}
-                    isDarkMode={isDarkMode}
-                    toggleTheme={toggleTheme}
-                  />
-                )
-              )}
-            </main>
+                )}
+              </main>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Search Popup */}
         <SearchPopup
@@ -304,10 +310,12 @@ function AppContent() {
         />
 
         {/* Avatar */}
-        <GLBAvatar 
-          selectedAvatar={selectedAvatar} 
-          onAvatarChange={handleAvatarChange} 
-        />
+        {!(view === "adminConsole" && adminPasswordVerified) && (
+          <GLBAvatar 
+            selectedAvatar={selectedAvatar} 
+            onAvatarChange={handleAvatarChange} 
+          />
+        )}
       </div>
     </div>
   );

@@ -528,6 +528,42 @@ async def get_users(current_user: dict = Depends(get_current_user)):
         conn.close()
 
 
+@app.get("/files")
+async def get_files(current_user: dict = Depends(get_current_user)):
+    # Only allow ADMIN and MANAGER roles to view files
+    if current_user["role"] not in ["ADMIN", "MANAGER"]:
+        raise HTTPException(status_code=403, detail="Not authorized to view files")
+    try:
+        conn = get_db()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    f.file_id,
+                    f.file_name,
+                    u.username AS uploaded_by,
+                    f.countries,
+                    f.departments,
+                    f.upload_time
+                FROM files f
+                LEFT JOIN users u ON f.uploaded_by = u.user_id
+                ORDER BY f.upload_time DESC
+            """)
+            files = cursor.fetchall()
+            # Convert bytes/None to string/list as needed
+            for file in files:
+                # If countries/departments are stored as comma-separated strings, keep as is
+                if isinstance(file["countries"], bytes):
+                    file["countries"] = file["countries"].decode()
+                if isinstance(file["departments"], bytes):
+                    file["departments"] = file["departments"].decode()
+            return files
+    except Exception as e:
+        print("ERROR in /files:", e)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch files: {str(e)}")
+    finally:
+        conn.close()
+
+
 @app.get("/list-files", response_model=List[str])
 def list_files():
     folder_path = Path(__file__).resolve().parent.parent / "pipeline" / "data" / "raw_data"
@@ -1163,3 +1199,10 @@ def get_chat_log(log_id: int):
             return {"messages": messages}
     finally:
         connection.close()
+
+# Serve the pipeline/misc folder as /static
+app.mount(
+    "/static",
+    StaticFiles(directory=str(PROJECT_ROOT / "pipeline" / "misc")),
+    name="static",
+)
