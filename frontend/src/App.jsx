@@ -13,6 +13,7 @@ import white_logo from '@/assets/images/logo-white.png';
 import ReactMarkdown from 'react-markdown';
 import FloatingWindow from "@/components/FloatingWindow";
 import GLBAvatar from '@/components/GLBAvatar';
+import { TTSProvider } from '@/contexts/TTSContext';
 
 const models = [
   {
@@ -35,7 +36,7 @@ const models = [
   },
 ];
 
-function App() {
+function AppContent() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -46,6 +47,11 @@ function App() {
   const [view, setView] = useState('chat');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
+  const [selectedAvatar, setSelectedAvatar] = useState('avatar6'); // ADD THIS STATE
+  const [selectedLogId, setSelectedLogId] = useState(null); // NEW
+  const chatbotRef = useRef(); // ADDED THIS THING
+  // const [messages, setMessages] = useState([]);
+
 
   const modelDropdownRef = useRef(null);
 
@@ -84,9 +90,18 @@ function App() {
     setIsDarkMode(prev => !prev);
   };
 
+  // const handleNewChat = () => {
+  //   setView('chat');
+  // };
+  // ADDED THIS THING
   const handleNewChat = () => {
     setView('chat');
-  };
+    // Call reset on Chatbot
+    if (chatbotRef.current && chatbotRef.current.resetChat) {
+      chatbotRef.current.resetChat();
+    }
+    setSelectedLogId(null); // Optionally reset selected log
+  };  
 
   const handleSearch = () => {
     setIsSearchOpen(true);
@@ -98,7 +113,7 @@ function App() {
       headers: { Authorization: `Bearer ${token}` }
     });
     const profileData = await profileRes.json();
-    setUserProfile(profileData.session); // session contains role, country, department, etc.
+    setUserProfile(profileData.session);
     setIsLoggedIn(true);
   };
 
@@ -113,13 +128,17 @@ function App() {
           },
         });
       } catch (err) {
-        // Optionally handle error (e.g., network issues)
         console.error('Logout failed:', err);
       }
     }
     localStorage.removeItem('token');
     setIsLoggedIn(false);
     setSelectedProfile(null);
+  };
+
+  // ADD THIS FUNCTION
+  const handleAvatarChange = (avatarName) => {
+    setSelectedAvatar(avatarName);
   };
 
   const currentModel = models.find(m => m.name === selectedModel);
@@ -176,7 +195,7 @@ function App() {
                   </button>
                   {showModelDropdown && (
                     <div className="absolute left-0 mt-4 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
-                      style={{ marginTop: '1.5rem' }} // Extra margin above dropdown
+                      style={{ marginTop: '1.5rem' }}
                     >
                       <ModelSelector
                         selectedModel={selectedModel}
@@ -190,7 +209,6 @@ function App() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {/* No buttons for the peasants */}
                 <div className="flex gap-2">
                   <button
                     onClick={() => setView('chat')}
@@ -221,7 +239,6 @@ function App() {
                     </>
                   )}
                 </div>
-                {/* Profile Dropdown */}
                 <ProfileDropdown
                   selectedProfile={selectedProfile}
                   setSelectedProfile={setSelectedProfile}
@@ -240,7 +257,14 @@ function App() {
             {/* Main View */}
             <main className="flex-1 min-h-0 flex flex-col">
               {view === 'chat' && (
-                <Chatbot userProfile={userProfile} selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
+                <Chatbot
+                  ref={chatbotRef} //ADDED THIS THING
+                  userProfile={userProfile}
+                  selectedModel={selectedModel}
+                  setSelectedModel={setSelectedModel}
+                  selectedLogId={selectedLogId}
+                  selectedAvatar={selectedAvatar} // ✅ pass selectedAvatar
+                />
               )}
               {view === 'uploadXlsx' && <UploadXlsxButton />}
               {view === 'uploadFile' && <UploadFile />}
@@ -262,11 +286,33 @@ function App() {
         </div>
 
         {/* Search Popup */}
-        <SearchPopup isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-        {/*<GLBAvatar />*/}
+        {/* PASS THE onChatSelect FUNCTION TO SearchPopup */}
+        <SearchPopup
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          onChatSelect={(logId) => {
+            setSelectedLogId(logId);    // track which chat to scroll to
+            setIsSearchOpen(false);     // close search popup
+            setView("chat");            // show chat view
+          }}
+        />
+        {/* MODIFY THIS LINE TO PASS PROPS */}
+        <GLBAvatar 
+          selectedAvatar={selectedAvatar} 
+          onAvatarChange={handleAvatarChange} 
+        />
         <FloatingWindow />
       </div>
     </div>
+  );
+}
+
+// Main App component wrapped with TTSProvider
+function App() {
+  return (
+    <TTSProvider>
+      <AppContent />
+    </TTSProvider>
   );
 }
 
