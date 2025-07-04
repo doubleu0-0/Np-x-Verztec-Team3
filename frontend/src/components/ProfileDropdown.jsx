@@ -41,7 +41,7 @@ export default function ProfileDropdown({
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-64 rounded-xl shadow-lg bg-white dark:bg-gray-800 p-4 z-50">
+        <div className="absolute right-0 bottom-full mb-2 w-64 rounded-xl shadow-lg bg-white dark:bg-gray-800 p-4 z-[60] border border-gray-200 dark:border-gray-700">
           <div className="grid grid-cols-3 gap-2 mb-4">
             {avatars.map((avatar, index) => (
               <img
