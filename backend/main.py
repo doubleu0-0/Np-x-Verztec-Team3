@@ -18,6 +18,7 @@ from pydantic import BaseModel, EmailStr
 # === Database & Files ===
 import pymysql
 import pymysql.cursors
+from io import BytesIO
 from openpyxl import load_workbook
 
 # === LLMs & Vector Store ===
@@ -777,9 +778,11 @@ async def upload_xlsx(
         raise HTTPException(status_code=400, detail="Only .xlsx files are allowed")
 
     try:
-        contents = await file.read()
-        wb = load_workbook(filename=io.BytesIO(contents))
-        sheet = wb.active
+        wb = load_workbook(filename=BytesIO(await file.read()), data_only=True)
+        if "users to add" in wb.sheetnames:
+            sheet = wb["users to add"]
+        else:
+            sheet = wb.active  # fallback to first sheet if not found
 
         conn = get_db()
         cursor = conn.cursor()
@@ -831,7 +834,7 @@ async def upload_xlsx(
                 cursor.execute("""
                     INSERT INTO upload_user_logs (user_id, created_user_id)
                     VALUES (%s, %s)
-                """, (current_user["user_id"], created_user_id))
+                    """, (current_user["user_id"], created_user_id))
 
             except pymysql.err.IntegrityError:
                 continue  # Skip duplicate entries
@@ -1252,33 +1255,62 @@ async def update_user(
             if current_user["role"] == "MANAGER":
                 if target["role"] == "ADMIN":
                     raise HTTPException(status_code=403, detail="Managers cannot edit admins")
-                if target["department"] != current_user["department"] or target["country"] != current_user["country"]:
+                if target["department"].strip().lower() != current_user["department"].strip().lower() or \
+                   target["country"].strip().lower() != current_user["country"].strip().lower():
                     raise HTTPException(status_code=403, detail="Managers can only edit users in their own department and country")
-                # Managers cannot change role to MANAGER or ADMIN
-                if "role" in data and data["role"] != "USER":
-                    raise HTTPException(status_code=403, detail="Managers can only set role to USER")
+                # Managers cannot set anyone to ADMIN
+                if "role" in data and data["role"] == "ADMIN":
+                    raise HTTPException(status_code=403, detail="Managers cannot set role to ADMIN")
 
             # Update allowed fields
-            allowed_fields = ["email", "department", "country"]
-            if current_user["role"] == "ADMIN":
-                allowed_fields.append("role")
-            elif current_user["role"] == "MANAGER":
-                # Managers can only change role to USER, but not for other MANAGERs
-                if target["role"] == "MANAGER" and data.get("role") and data["role"] != "MANAGER":
-                    raise HTTPException(status_code=403, detail="Managers cannot demote other managers")
-                allowed_fields.append("role")
+            allowed_fields = ["email", "department", "country", "role"]
 
             updates = []
             params = []
+            audit_logs = []
+            now = datetime.now()
+
             for field in allowed_fields:
-                if field in data:
+                if field in data and data[field] != target.get(field):
                     updates.append(f"{field} = %s")
                     params.append(data[field])
+                    # Prepare audit log for this field
+                    audit_logs.append({
+                        "target_username": target["username"],
+                        "changed_by_username": current_user["username"],
+                        "field_name": field,
+                        "old_value": target.get(field),
+                        "new_value": data[field],
+                        "changed_at": now
+                    })
+
             if not updates:
                 raise HTTPException(status_code=400, detail="No valid fields to update")
+            
+            # Update the database
+            updates.append("updated_at = %s")
+            params.append(now)
             params.append(user_id)
             sql = f"UPDATE users SET {', '.join(updates)} WHERE user_id = %s"
             cursor.execute(sql, params)
+
+            # Insert audit logs
+            for log in audit_logs:
+                cursor.execute(
+                    """
+                    INSERT INTO user_update_logs (target_username, changed_by_username, field_name, old_value, new_value, changed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        log["target_username"],
+                        log["changed_by_username"],
+                        log["field_name"],
+                        log["old_value"],
+                        log["new_value"],
+                        log["changed_at"]
+                    )
+                )
+
             conn.commit()
             return {"message": "User updated successfully"}
     finally:
@@ -1302,8 +1334,27 @@ async def delete_user(
             if current_user["role"] == "MANAGER":
                 if target["role"] == "ADMIN":
                     raise HTTPException(status_code=403, detail="Managers cannot delete admins")
-                if target["department"] != current_user["department"] or target["country"] != current_user["country"]:
+                # Managers can delete other managers and users in their own department and country
+                if target["department"].strip().lower() != current_user["department"].strip().lower() or \
+                   target["country"].strip().lower() != current_user["country"].strip().lower():
                     raise HTTPException(status_code=403, detail="Managers can only delete users in their own department and country")
+            # Log deletion
+            cursor.execute(
+                """
+                INSERT INTO user_deletion_logs (
+                    deleted_username, deleted_email, department, role, country, deleted_by_username, deleted_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    target["username"],
+                    target["email"],
+                    target["department"],
+                    target["role"],
+                    target["country"],
+                    current_user["username"],
+                    datetime.now()
+                )
+            )
             cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
             conn.commit()
             return {"message": "User deleted successfully"}

@@ -15,7 +15,143 @@ function isAll(list, allList) {
   return list.length === allList.length;
 }
 
-export default function PolicyDocuments() {
+const EditFileModal = ({ file, onClose, onSave, currentUser }) => {
+  const [form, setForm] = useState({
+    file_name: file.file_name || "",
+    departments: file.departments || "",
+    countries: file.countries || "",
+    uploaded_by: file.uploaded_by || "",
+  });
+
+  const isManager = currentUser?.role === "MANAGER";
+  const managerDept = currentUser?.department;
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({ ...file, ...form });
+  };
+
+  // Department options: managers get only their department or ALL, admins get all
+  const departmentOptions = isManager
+    ? [managerDept, "ALL"]
+    : ["ALL", ...ALL_DEPARTMENTS];
+
+  // Country select: managers cannot change, admins can
+  const countrySelectProps = isManager
+    ? {
+        disabled: true,
+        className:
+          "w-full px-3 py-2 border rounded bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-80 border-gray-300 dark:border-gray-600",
+        "aria-disabled": true,
+        title: "Managers cannot change country",
+      }
+    : {
+        className: "w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white",
+      };
+
+  const countryOptions = ["ALL", ...ALL_COUNTRIES];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md relative">
+        <button
+          className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+          onClick={onClose}
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Edit File</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm mb-1 text-gray-700 dark:text-gray-300">File Name</label>
+            <input
+              name="file_name"
+              value={form.file_name}
+              className="w-full px-3 py-2 border rounded bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-80 font-semibold"
+              disabled
+              readOnly
+              tabIndex={-1}
+              aria-disabled="true"
+              title="File name cannot be changed"
+            />
+            <span className="text-xs text-gray-400 dark:text-gray-500 italic">File name cannot be changed</span>
+          </div>
+          <div>
+            <label className="block text-sm mb-1 text-gray-700 dark:text-gray-300">Departments</label>
+            <select
+              name="departments"
+              value={form.departments}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
+              required
+            >
+              <option value="" disabled>Select department</option>
+              {departmentOptions.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm mb-1 text-gray-700 dark:text-gray-300">Countries</label>
+            <select
+              name="countries"
+              value={form.countries}
+              onChange={handleChange}
+              required
+              {...countrySelectProps}
+            >
+              <option value="" disabled>Select country</option>
+              {countryOptions.map(country => (
+                <option key={country} value={country}>{country}</option>
+              ))}
+            </select>
+            {isManager && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+                Managers cannot change country.
+              </span>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm mb-1 text-gray-700 dark:text-gray-300">Uploader</label>
+            <input
+              name="uploaded_by"
+              value={form.uploaded_by}
+              className="w-full px-3 py-2 border rounded bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-80 font-semibold"
+              disabled
+              readOnly
+              tabIndex={-1}
+              aria-disabled="true"
+              title="Uploader cannot be changed"
+            />
+            <span className="text-xs text-gray-400 dark:text-gray-500 italic">Uploader cannot be changed</span>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded bg-yellow-500 text-black font-semibold hover:bg-yellow-600"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default function PolicyDocuments({ currentUser }) {
   const [fileList, setFileList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -141,9 +277,9 @@ export default function PolicyDocuments() {
   const closeEditModal = () => setEditFile(null);
 
   return (
-    <div className="pt-4 pb-2">
-      <div className="mb-4">
-        <div className="flex gap-4 mb-4 items-center">
+    <div className="pt-1 pb-2">
+      <div className="mb-2">
+        <div className="flex gap-4 mb-1 items-center">
           <input
             type="text"
             placeholder="Search by file name, department, country, or uploader..."
@@ -214,8 +350,17 @@ export default function PolicyDocuments() {
                 onClick={() => handleSort('uploaded_by')}
               >
                 <div className="flex items-center gap-1">
-                  Uploaded By
+                  Uploader
                   {getSortIcon('uploaded_by')}
+                </div>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                onClick={() => handleSort('upload_time')}
+              >
+                <div className="flex items-center gap-1">
+                  Created
+                  {getSortIcon('upload_time')}
                 </div>
               </th>
               <th className="w-10 px-1 py-3"></th>
@@ -224,11 +369,11 @@ export default function PolicyDocuments() {
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {loading ? (
               <tr>
-                <td colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">Loading files...</td>
+                <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">Loading files...</td>
               </tr>
             ) : paginatedFiles.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">No files found.</td>
+                <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">No files found.</td>
               </tr>
             ) : (
               paginatedFiles.map((file, idx) => {
@@ -247,6 +392,9 @@ export default function PolicyDocuments() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
                       {file.uploaded_by}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
+                      {file.upload_time ? new Date(file.upload_time).toLocaleDateString() : "N/A"}
                     </td>
                     <td className="w-10 px-1 py-4 relative">
                       <button
@@ -302,37 +450,15 @@ export default function PolicyDocuments() {
 
       {/* Edit File Modal */}
       {editFile && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md relative">
-            <button
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              onClick={closeEditModal}
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Edit File</h2>
-            <div className="mb-4">
-              <div className="text-sm text-gray-700 dark:text-gray-200 mb-2">
-                <strong>File Name:</strong> {editFile.file_name}
-              </div>
-              {/* Add more editable fields as needed */}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
-                onClick={closeEditModal}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 rounded bg-yellow-500 hover:bg-yellow-600 text-white font-semibold"
-                onClick={closeEditModal}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
+        <EditFileModal
+          file={editFile}
+          onClose={closeEditModal}
+          onSave={(updatedFile) => {
+            setEditFile(null);
+            // Optionally update fileList state if needed
+          }}
+          currentUser={currentUser} // <-- Use the real currentUser prop
+        />
       )}
 
       {/* Filter Popup */}

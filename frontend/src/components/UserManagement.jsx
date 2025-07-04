@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, ChevronUp, ChevronDown, MoreVertical, X } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, MoreVertical, X, RefreshCw } from 'lucide-react';
 import { createPortal } from "react-dom";
 
 const ALL_DEPARTMENTS = [
@@ -44,7 +44,10 @@ const EditUserModal = ({ user, onClose, onSave, currentUser }) => {
 
   // Only allow USER role if currentUser is MANAGER
   const roleOptions = currentUser?.role === "MANAGER"
-    ? [{ value: "USER", label: "USER" }]
+    ? [
+        { value: "USER", label: "USER" },
+        { value: "MANAGER", label: "MANAGER" }
+      ]
     : [
         { value: "USER", label: "USER" },
         { value: "MANAGER", label: "MANAGER" },
@@ -98,14 +101,26 @@ const EditUserModal = ({ user, onClose, onSave, currentUser }) => {
               name="department"
               value={form.department}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
+              className={`w-full px-3 py-2 border rounded 
+                ${currentUser?.role === "MANAGER"
+                  ? "bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed opacity-80 border-gray-300 dark:border-gray-600"
+                  : "dark:bg-gray-700 dark:text-white"
+                }`}
               required
+              disabled={currentUser?.role === "MANAGER"}
+              aria-disabled={currentUser?.role === "MANAGER"}
+              title={currentUser?.role === "MANAGER" ? "Managers cannot edit department settings." : undefined}
             >
               <option value="" disabled>Select department</option>
               {ALL_DEPARTMENTS.map(dept => (
                 <option key={dept} value={dept}>{dept}</option>
               ))}
             </select>
+            {currentUser?.role === "MANAGER" && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+                MANAGERS cannot edit department settings.
+              </span>
+            )}
           </div>
           <div>
             <label className="block text-sm mb-1 text-gray-700 dark:text-gray-300">Country</label>
@@ -113,14 +128,26 @@ const EditUserModal = ({ user, onClose, onSave, currentUser }) => {
               name="country"
               value={form.country}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
+              className={`w-full px-3 py-2 border rounded 
+                ${currentUser?.role === "MANAGER"
+                  ? "bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed opacity-80 border-gray-300 dark:border-gray-600"
+                  : "dark:bg-gray-700 dark:text-white"
+                }`}
               required
+              disabled={currentUser?.role === "MANAGER"}
+              aria-disabled={currentUser?.role === "MANAGER"}
+              title={currentUser?.role === "MANAGER" ? "Managers cannot edit country settings." : undefined}
             >
               <option value="" disabled>Select country</option>
               {ALL_COUNTRIES.map(country => (
                 <option key={country} value={country}>{country}</option>
               ))}
             </select>
+            {currentUser?.role === "MANAGER" && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+                MANAGERS cannot edit country settings.
+              </span>
+            )}
           </div>
           <div>
             <label className="block text-sm mb-1 text-gray-700 dark:text-gray-300">Role</label>
@@ -130,18 +157,11 @@ const EditUserModal = ({ user, onClose, onSave, currentUser }) => {
               onChange={handleChange}
               className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
               required
-              disabled={currentUser?.role === "MANAGER" && user.role !== "USER"}
-              // Managers cannot change role of MANAGERs
             >
               {roleOptions.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-            {currentUser?.role === "MANAGER" && user.role !== "USER" && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 italic">
-                Managers cannot change the role of other managers.
-              </span>
-            )}
           </div>
           <div className="flex justify-end gap-2">
             <button
@@ -217,6 +237,16 @@ export default function UserManagement({ isDarkMode, currentUser }) {
 
   // Filtering and sorting
   const filteredAndSortedUsers = users
+    .filter(user => {
+      // If manager, only show users in same department and country
+      if (currentUser?.role === "MANAGER") {
+        return (
+          user.department?.trim().toLowerCase() === currentUser.department?.trim().toLowerCase() &&
+          user.country?.trim().toLowerCase() === currentUser.country?.trim().toLowerCase()
+        );
+      }
+      return true; // Admins see all
+    })
     .filter(user =>
       user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -228,7 +258,6 @@ export default function UserManagement({ isDarkMode, currentUser }) {
       if (!sortConfig.key) return 0;
       const aValue = a[sortConfig.key] || '';
       const bValue = b[sortConfig.key] || '';
-      // Numeric sort for user_id, string sort for others
       if (sortConfig.key === 'user_id') {
         return sortConfig.direction === 'asc'
           ? Number(aValue) - Number(bValue)
@@ -320,16 +349,21 @@ export default function UserManagement({ isDarkMode, currentUser }) {
     }
   };
 
-  // Only allow managers to edit/delete users and managers (not admins), and only in their own department & country
+  // Only allow managers to edit/delete users and managers (not admins), and only in their own country
   const canManagerEditOrDelete = (targetUser) => {
     if (!currentUser || currentUser.role !== "MANAGER") return true; // Admins can edit/delete anyone
-    // Managers can only edit/delete users and managers (not admins) in their own department & country
-    if (targetUser.role === "ADMIN") return false; // Managers cannot edit/delete admins
+    if (targetUser.role === "ADMIN") return false;
     return (
       (targetUser.role === "USER" || targetUser.role === "MANAGER") &&
-      targetUser.department === currentUser.department &&
-      targetUser.country === currentUser.country
+      targetUser.department.trim().toLowerCase() === currentUser.department.trim().toLowerCase() &&
+      targetUser.country.trim().toLowerCase() === currentUser.country.trim().toLowerCase()
     );
+  };
+
+  // Add this function to manually refresh users
+  const handleRefresh = () => {
+    setLoading(true);
+    fetchUsers();
   };
 
   if (loading) {
@@ -343,9 +377,9 @@ export default function UserManagement({ isDarkMode, currentUser }) {
   }
 
   return (
-    <div className="pt-4 pb-2">
+    <div className="pt-1 pb-2">
       <div className="mb-4">
-        <div className="flex gap-4 mb-4 items-center">
+        <div className="flex gap-4 mb-2 items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
@@ -356,6 +390,16 @@ export default function UserManagement({ isDarkMode, currentUser }) {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white"
             />
           </div>
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-yellow-100 dark:hover:bg-yellow-800 transition"
+            title="Refresh user list"
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
           {/* Users per page selector */}
           <div>
             <select
