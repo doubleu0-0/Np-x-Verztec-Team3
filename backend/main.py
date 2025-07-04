@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*grpcio.*", module="opentelemetry.*")
 # === FastAPI Core ===
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, Form
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, Form, Body
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -514,15 +514,25 @@ async def get_users(current_user: dict = Depends(get_current_user)):
     try:
         conn = get_db()
         with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT user_id, username, email, role, department, country, updated_at
-                FROM users
-                ORDER BY updated_at DESC
-            """)
+            if current_user["role"] == "MANAGER":
+                # Managers only see users in their own country
+                cursor.execute("""
+                    SELECT user_id, username, email, role, department, country, updated_at
+                    FROM users
+                    WHERE country = %s
+                    ORDER BY updated_at DESC
+                """, (current_user["country"],))
+            else:
+                # Admins see all users
+                cursor.execute("""
+                    SELECT user_id, username, email, role, department, country, updated_at
+                    FROM users
+                    ORDER BY updated_at DESC
+                """)
             users = cursor.fetchall()
             return users
     except Exception as e:
-        print("ERROR in /users:", e)  # <--- Add this line
+        print("ERROR in /users:", e)
         raise HTTPException(status_code=500, detail=f"Failed to fetch users: {str(e)}")
     finally:
         conn.close()
@@ -536,22 +546,38 @@ async def get_files(current_user: dict = Depends(get_current_user)):
     try:
         conn = get_db()
         with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT 
-                    f.file_id,
-                    f.file_name,
-                    u.username AS uploaded_by,
-                    f.countries,
-                    f.departments,
-                    f.upload_time
-                FROM files f
-                LEFT JOIN users u ON f.uploaded_by = u.user_id
-                ORDER BY f.upload_time DESC
-            """)
+            if current_user["role"] == "MANAGER":
+                # Managers only see files for their country and department
+                cursor.execute("""
+                    SELECT 
+                        f.file_id,
+                        f.file_name,
+                        u.username AS uploaded_by,
+                        f.countries,
+                        f.departments,
+                        f.upload_time
+                    FROM files f
+                    LEFT JOIN users u ON f.uploaded_by = u.user_id
+                    WHERE FIND_IN_SET(%s, REPLACE(f.countries, ', ', ',')) > 0
+                    ORDER BY f.upload_time DESC
+                """, (current_user["country"],))
+            else:
+                # Admins see all files
+                cursor.execute("""
+                    SELECT 
+                        f.file_id,
+                        f.file_name,
+                        u.username AS uploaded_by,
+                        f.countries,
+                        f.departments,
+                        f.upload_time
+                    FROM files f
+                    LEFT JOIN users u ON f.uploaded_by = u.user_id
+                    ORDER BY f.upload_time DESC
+                """)
             files = cursor.fetchall()
             # Convert bytes/None to string/list as needed
             for file in files:
-                # If countries/departments are stored as comma-separated strings, keep as is
                 if isinstance(file["countries"], bytes):
                     file["countries"] = file["countries"].decode()
                 if isinstance(file["departments"], bytes):
@@ -1206,3 +1232,80 @@ app.mount(
     StaticFiles(directory=str(PROJECT_ROOT / "pipeline" / "misc")),
     name="static",
 )
+
+@app.put("/users/{user_id}")
+async def update_user(
+    user_id: int,
+    data: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    # Fetch target user
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+            target = cursor.fetchone()
+            if not target:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            # Only ADMIN can edit anyone. MANAGER can only edit USER or MANAGER in their own dept/country, not ADMINs.
+            if current_user["role"] == "MANAGER":
+                if target["role"] == "ADMIN":
+                    raise HTTPException(status_code=403, detail="Managers cannot edit admins")
+                if target["department"] != current_user["department"] or target["country"] != current_user["country"]:
+                    raise HTTPException(status_code=403, detail="Managers can only edit users in their own department and country")
+                # Managers cannot change role to MANAGER or ADMIN
+                if "role" in data and data["role"] != "USER":
+                    raise HTTPException(status_code=403, detail="Managers can only set role to USER")
+
+            # Update allowed fields
+            allowed_fields = ["email", "department", "country"]
+            if current_user["role"] == "ADMIN":
+                allowed_fields.append("role")
+            elif current_user["role"] == "MANAGER":
+                # Managers can only change role to USER, but not for other MANAGERs
+                if target["role"] == "MANAGER" and data.get("role") and data["role"] != "MANAGER":
+                    raise HTTPException(status_code=403, detail="Managers cannot demote other managers")
+                allowed_fields.append("role")
+
+            updates = []
+            params = []
+            for field in allowed_fields:
+                if field in data:
+                    updates.append(f"{field} = %s")
+                    params.append(data[field])
+            if not updates:
+                raise HTTPException(status_code=400, detail="No valid fields to update")
+            params.append(user_id)
+            sql = f"UPDATE users SET {', '.join(updates)} WHERE user_id = %s"
+            cursor.execute(sql, params)
+            conn.commit()
+            return {"message": "User updated successfully"}
+    finally:
+        conn.close()
+
+@app.delete("/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+            target = cursor.fetchone()
+            if not target:
+                raise HTTPException(status_code=404, detail="User not found")
+            # Prevent users from deleting themselves
+            if user_id == current_user["user_id"]:
+                raise HTTPException(status_code=403, detail="You cannot delete your own account.")
+            if current_user["role"] == "MANAGER":
+                if target["role"] == "ADMIN":
+                    raise HTTPException(status_code=403, detail="Managers cannot delete admins")
+                if target["department"] != current_user["department"] or target["country"] != current_user["country"]:
+                    raise HTTPException(status_code=403, detail="Managers can only delete users in their own department and country")
+            cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+            conn.commit()
+            return {"message": "User deleted successfully"}
+    finally:
+        conn.close()

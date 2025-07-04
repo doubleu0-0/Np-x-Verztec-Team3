@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Search, ChevronUp, ChevronDown, MoreVertical, X } from 'lucide-react';
+import { createPortal } from "react-dom";
 
-const EditUserModal = ({ user, onClose, onSave }) => {
+const ALL_DEPARTMENTS = [
+  "Marketing","Procurement","IT","Project Management","Human Resource","Admin & Operations","Business Development","Finance","Service Delivery"
+];
+const ALL_COUNTRIES = [
+  "Singapore", "United Kingdom", "United States", "Thailand", 
+  "Indonesia", "Korea", "China", "Japan", "Vietnam", "Myanmar"
+];
+
+const EditUserModal = ({ user, onClose, onSave, currentUser }) => {
   const [form, setForm] = useState({
     username: user.username || '',
     email: user.email || '',
@@ -9,15 +18,38 @@ const EditUserModal = ({ user, onClose, onSave }) => {
     country: user.country || '',
     role: user.role || '',
   });
+  const [emailError, setEmailError] = useState('');
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+
+    if (name === "email") {
+      if (!value.endsWith("@verztec.com")) {
+        setEmailError("Email must end with @verztec.com");
+      } else {
+        setEmailError("");
+      }
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!form.email.endsWith("@verztec.com")) {
+      setEmailError("Email must end with @verztec.com");
+      return;
+    }
     onSave({ ...user, ...form });
   };
+
+  // Only allow USER role if currentUser is MANAGER
+  const roleOptions = currentUser?.role === "MANAGER"
+    ? [{ value: "USER", label: "USER" }]
+    : [
+        { value: "USER", label: "USER" },
+        { value: "MANAGER", label: "MANAGER" },
+        { value: "ADMIN", label: "ADMIN" }
+      ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -35,10 +67,16 @@ const EditUserModal = ({ user, onClose, onSave }) => {
             <input
               name="username"
               value={form.username}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
+              className="w-full px-3 py-2 border rounded bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-80 font-semibold"
               required
+              disabled
+              readOnly
+              tabIndex={-1}
+              aria-disabled="true"
+              title="Username cannot be changed"
+              style={{ letterSpacing: "0.03em" }}
             />
+            <span className="text-xs text-gray-400 dark:text-gray-500 italic">Username cannot be changed</span>
           </div>
           <div>
             <label className="block text-sm mb-1 text-gray-700 dark:text-gray-300">Email</label>
@@ -47,27 +85,42 @@ const EditUserModal = ({ user, onClose, onSave }) => {
               type="email"
               value={form.email}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
+              className={`w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white ${emailError ? "border-red-500" : ""}`}
               required
             />
+            {emailError && (
+              <span className="text-xs text-red-500">{emailError}</span>
+            )}
           </div>
           <div>
             <label className="block text-sm mb-1 text-gray-700 dark:text-gray-300">Department</label>
-            <input
+            <select
               name="department"
               value={form.department}
               onChange={handleChange}
               className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
-            />
+              required
+            >
+              <option value="" disabled>Select department</option>
+              {ALL_DEPARTMENTS.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm mb-1 text-gray-700 dark:text-gray-300">Country</label>
-            <input
+            <select
               name="country"
               value={form.country}
               onChange={handleChange}
               className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
-            />
+              required
+            >
+              <option value="" disabled>Select country</option>
+              {ALL_COUNTRIES.map(country => (
+                <option key={country} value={country}>{country}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm mb-1 text-gray-700 dark:text-gray-300">Role</label>
@@ -77,11 +130,18 @@ const EditUserModal = ({ user, onClose, onSave }) => {
               onChange={handleChange}
               className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
               required
+              disabled={currentUser?.role === "MANAGER" && user.role !== "USER"}
+              // Managers cannot change role of MANAGERs
             >
-              <option value="USER">USER</option>
-              <option value="MANAGER">MANAGER</option>
-              <option value="ADMIN">ADMIN</option>
+              {roleOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
+            {currentUser?.role === "MANAGER" && user.role !== "USER" && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+                Managers cannot change the role of other managers.
+              </span>
+            )}
           </div>
           <div className="flex justify-end gap-2">
             <button
@@ -94,6 +154,7 @@ const EditUserModal = ({ user, onClose, onSave }) => {
             <button
               type="submit"
               className="px-4 py-2 rounded bg-yellow-500 text-black font-semibold hover:bg-yellow-600"
+              disabled={!!emailError}
             >
               Save
             </button>
@@ -104,7 +165,7 @@ const EditUserModal = ({ user, onClose, onSave }) => {
   );
 };
 
-export default function UserManagement({ isDarkMode }) {
+export default function UserManagement({ isDarkMode, currentUser }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -195,20 +256,42 @@ export default function UserManagement({ isDarkMode }) {
   };
 
   const handleEdit = (user) => {
+    if (user.user_id === currentUser?.user_id) {
+      alert("You cannot edit your own information.");
+      return;
+    }
+    if (currentUser?.role === "MANAGER" && user.role === "ADMIN") {
+      alert("Managers cannot edit ADMIN information.");
+      return;
+    }
     setEditUser(user);
     setMenuOpen(null);
   };
 
   const handleDelete = async (user) => {
+    // Prevent deleting yourself
+    if (String(user.user_id) === String(currentUser?.user_id)) {
+      alert("You cannot delete your own account.");
+      return;
+    }
+    if (currentUser?.role === "MANAGER" && user.role === "ADMIN") {
+      alert("Managers cannot delete ADMINs.");
+      return;
+    }
     setMenuOpen(null);
     if (window.confirm(`Delete user "${user.username}"?`)) {
       try {
         const token = localStorage.getItem('token');
-        await fetch(`http://localhost:8000/users/${user.user_id}`, {
+        const response = await fetch(`http://localhost:8000/users/${user.user_id}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
         });
-        setUsers(users.filter(u => u.user_id !== user.user_id));
+        if (response.ok) {
+          setUsers(users.filter(u => u.user_id !== user.user_id));
+        } else {
+          const data = await response.json();
+          alert(data.detail || 'Failed to delete user.');
+        }
       } catch (err) {
         alert('Failed to delete user.');
       }
@@ -235,6 +318,18 @@ export default function UserManagement({ isDarkMode }) {
     } catch {
       alert('Failed to update user.');
     }
+  };
+
+  // Only allow managers to edit/delete users and managers (not admins), and only in their own department & country
+  const canManagerEditOrDelete = (targetUser) => {
+    if (!currentUser || currentUser.role !== "MANAGER") return true; // Admins can edit/delete anyone
+    // Managers can only edit/delete users and managers (not admins) in their own department & country
+    if (targetUser.role === "ADMIN") return false; // Managers cannot edit/delete admins
+    return (
+      (targetUser.role === "USER" || targetUser.role === "MANAGER") &&
+      targetUser.department === currentUser.department &&
+      targetUser.country === currentUser.country
+    );
   };
 
   if (loading) {
@@ -370,27 +465,37 @@ export default function UserManagement({ isDarkMode }) {
                     </div>
                   </td>
                   <td className="w-10 px-1 py-4 relative" style={{ minWidth: 40 }}>
-                    <button
-                      className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                      onClick={() => handleMenuOpen(user.user_id)}
-                    >
-                      <MoreVertical className="w-5 h-5" />
-                    </button>
-                    {menuOpen === user.user_id && (
-                      <div className="absolute right-0 mt-2 w-28 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-10">
+                    {canManagerEditOrDelete(user) && user.user_id !== currentUser?.user_id && (
+                      <>
                         <button
-                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-xl"
-                          onClick={() => handleEdit(user)}
+                          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                          onClick={() => handleMenuOpen(user.user_id)}
                         >
-                          Edit
+                          <MoreVertical className="w-5 h-5" />
                         </button>
-                        <button
-                          className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-xl"
-                          onClick={() => handleDelete(user)}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                        {menuOpen === user.user_id &&
+                          createPortal(
+                            <div
+                              className="fixed z-50 right-8 top-1/2 w-28 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl"
+                              style={{ transform: "translateY(-50%)" }}
+                            >
+                              <button
+                                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-xl text-gray-900 dark:text-white"
+                                onClick={() => handleEdit(user)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-xl"
+                                onClick={() => handleDelete(user)}
+                              >
+                                Delete
+                              </button>
+                            </div>,
+                            document.body
+                          )
+                        }
+                      </>
                     )}
                   </td>
                 </tr>
@@ -431,6 +536,7 @@ export default function UserManagement({ isDarkMode }) {
           user={editUser}
           onClose={() => setEditUser(null)}
           onSave={handleEditSave}
+          currentUser={currentUser}
         />
       )}
     </div>
