@@ -5,7 +5,8 @@ import userIcon from '@/assets/images/user.svg';
 import errorIcon from '@/assets/images/error.svg';
 import { useEffect, useRef } from 'react';
 
-function ChatMessages({ messages, isLoading }) {
+// changed this line below
+function ChatMessages({ messages, isLoading, selectedAvatar }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -14,55 +15,60 @@ function ChatMessages({ messages, isLoading }) {
     }
   }, [messages]);
 
-  // Default Male Voice
-  // useEffect(() => {
-  //   if (!messages.length) return;
-  //   const last = messages[messages.length - 1];
-
-  //   if (last.role === 'assistant' && last.content && !last.loading) {
-  //     const utterance = new SpeechSynthesisUtterance(last.content);
-  //     utterance.lang = 'en-US';
-  //     speechSynthesis.speak(utterance);
-  //   }
-  // }, [messages]);
-
-  // Default Female Voice
+// changed this chunk below (only 2 types of voices, one for all the female avatars, another for all the male avatars)
   useEffect(() => {
     if (!messages.length) return;
     const last = messages[messages.length - 1];
 
     if (last.role === 'assistant' && last.content && !last.loading) {
-      const speakWithFemaleVoice = () => {
+      const speakWithAvatarVoice = () => {
         const voices = speechSynthesis.getVoices();
-        
-        // Try to find a female-sounding English voice
-        const femaleVoice = voices.find(
-          (v) =>
-            v.lang === 'en-US' &&
-            (v.name.toLowerCase().includes('female') ||
-            v.name.toLowerCase().includes('zira') || // Windows
-            v.name.toLowerCase().includes('samantha') || // macOS
-            v.name.toLowerCase().includes('google us english')) // Chrome
+
+        // Trim at "📄"
+        const trimmedContent = last.content.split("📄")[0];
+        if (trimmedContent.trim().length === 0) return;
+
+        // ✅ Extract avatar number (e.g., 'avatar6' → 6)
+        const avatarNum = parseInt(selectedAvatar.replace('avatar', ''), 10);
+        const isFemale = [1, 5, 6].includes(avatarNum);
+
+        // ✅ Pick voice based on gender
+        const preferredVoice = voices.find(v =>
+          v.lang === 'en-US' &&
+          (
+            (isFemale && (
+              v.name.toLowerCase().includes('female') ||
+              v.name.toLowerCase().includes('zira') ||
+              v.name.toLowerCase().includes('samantha') ||
+              v.name.toLowerCase().includes('google us english')
+            )) ||
+            (!isFemale && (
+              v.name.toLowerCase().includes('male') ||
+              v.name.toLowerCase().includes('david') ||
+              v.name.toLowerCase().includes('google us english')
+            ))
+          )
         ) || voices.find(v => v.lang === 'en-US'); // fallback
 
-        const utterance = new SpeechSynthesisUtterance(last.content);
-        utterance.voice = femaleVoice;
+        const utterance = new SpeechSynthesisUtterance(trimmedContent);
+        utterance.voice = preferredVoice;
         utterance.lang = 'en-US';
         utterance.pitch = 1;
         utterance.rate = 1;
         speechSynthesis.speak(utterance);
       };
 
-      // Handle case when voices might not be ready yet
       if (speechSynthesis.getVoices().length) {
-        speakWithFemaleVoice();
+        speakWithAvatarVoice();
       } else {
         speechSynthesis.onvoiceschanged = () => {
-          speakWithFemaleVoice();
+          speakWithAvatarVoice();
         };
       }
     }
-  }, [messages]);
+  }, [messages, selectedAvatar]);
+
+
 
   return (
     // changed this line below
