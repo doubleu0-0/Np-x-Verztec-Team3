@@ -6,7 +6,10 @@ import PolicyDocuments from './PolicyDocuments'; // Add this import
 import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
 import UserManagement from './UserManagement'; // Add this at the top
-
+const ALL_COUNTRIES = ['Singapore', 'United Kingdom', 'United States', 'Thailand', 
+  'Indonesia', 'Korea', 'China', 'Japan', 'Vietnam', 'Myanmar'];
+const ALL_DEPARTMENTS = ['Human Resource', 'Admin & Operations', 'Project Management',
+  'Procurement', 'IT', 'Marketing', 'Business Development', 'Finance', 'Service Delivery'];
 const AdminSidebar = ({ activeTab, setActiveTab, isDarkMode, userProfile, toggleTheme, handleLogout }) => {
   const menuItems = [
     { id: 'users', label: 'User Management', icon: Users },
@@ -118,6 +121,13 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
       default:
         return null;
     }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    let departments = form.departments === "ALL" ? ALL_DEPARTMENTS : [form.departments];
+    let countries = form.countries === "ALL" ? ALL_COUNTRIES : [form.countries];
+    onSave({ ...file, ...form, departments, countries });
   };
 
   return (

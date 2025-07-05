@@ -1,17 +1,9 @@
 {
   "departments": [
-    "Human Resource",
-    "Admin & Operations",
-    "Project Management",
-    "Procurement",
-    "IT",
-    "Marketing",
-    "Business Development",
-    "Finance",
-    "Service Delivery"
+    "Marketing,Procurement,IT,Project Management,Human Resource,Admin & Operations,Business Development,Finance,Service Delivery"
   ],
   "countries": [
-    "Singapore"
+    "Vietnam"
   ],
   "uploaded_by": "j",
   "upload_time": "2025-07-04T14:20:19.886777"

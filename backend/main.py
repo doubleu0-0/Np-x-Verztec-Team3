@@ -315,13 +315,20 @@ async def stream_answer(
     country = current_user.get("country")
     department = current_user.get("department")
 
+    def normalize_key(key):
+        return key.strip()
+
+    country_key = normalize_key(country)
+    department_key = normalize_key(department)
+
+
     if role == "ADMIN":
         retriever = VectorIndexRetriever(index=index, similarity_top_k=5)
     else:
         filters = MetadataFilters(
             filters=[
-                MetadataFilter(key=country, value="True", operator=FilterOperator.EQ),
-                MetadataFilter(key=department, value="True", operator=FilterOperator.EQ)
+                MetadataFilter(key=country_key, value="True", operator=FilterOperator.EQ),
+                MetadataFilter(key=department_key, value="True", operator=FilterOperator.EQ)
             ]
         )
         retriever = VectorIndexRetriever(index=index, similarity_top_k=5, filters=filters)
@@ -1360,3 +1367,121 @@ async def delete_user(
             return {"message": "User deleted successfully"}
     finally:
         conn.close()
+
+
+@app.put("/update-file/{filename}")
+async def update_file_metadata(
+    filename: str,
+    departments: List[str] = Form(...),
+    countries: List[str] = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Updates file metadata (departments, countries) for a given file.
+    - Updates all sidecar .meta.json files with the same base name
+    - Updates the database record
+    - Updates ChromaDB document metadata for this file
+    """
+    file_path = UPLOAD_DIR / filename
+    meta_path = file_path.with_suffix(file_path.suffix + ".meta.json")
+    if not meta_path.exists():
+        raise HTTPException(status_code=404, detail="Metadata file not found")
+
+    # Load metadata for the file (for passing to update_docs_with_metadata)
+    with open(meta_path, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+    meta["departments"] = departments
+    meta["countries"] = countries
+
+    # Update DB
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE files SET departments=%s, countries=%s WHERE file_name=%s",
+                (",".join(departments), ",".join(countries), filename)
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Update ChromaDB and ALL .meta.json files with the same base name
+    update_docs_with_metadata(filename, meta)
+
+    return {"message": "File metadata updated"}
+
+
+def update_docs_with_metadata(filename, file_metadata):
+    """
+    Updates all Chroma documents whose 'title' in metadata matches the given filename (tries all common extensions).
+    Sets specified department and country flags. Preserves 'uploaded_by' and 'upload_time' if already set.
+    Also updates all .meta.json files with the same base name.
+    """
+    import os
+    import glob
+    from datetime import datetime
+
+    ALL_DEPARTMENTS = [
+        "Human Resource", "Admin & Operations", "Project Management", "Procurement",
+        "IT", "Marketing", "Business Development", "Finance", "Service Delivery"
+    ]
+
+    ALL_COUNTRIES = [
+        "Singapore", "United Kingdom", "United States", "Thailand", "Indonesia",
+        "Korea", "China", "Japan", "Vietnam", "Myanmar"
+    ]
+
+    # Use the provided lists
+    departments = file_metadata.get("departments", [])
+    countries = file_metadata.get("countries", [])
+
+    # Extract base filename without extension
+    base_name = os.path.splitext(filename)[0]
+    possible_exts = [".pdf", ".doc", ".docx", ".txt"]
+    updated_any = False
+
+    # Update ChromaDB docs for all possible extensions
+    all_docs = chroma_collection.get(limit=1000)
+    for ext in possible_exts:
+        full_title = f"{base_name}{ext}"
+        matching_indices = [
+            i for i, metadata in enumerate(all_docs["metadatas"])
+            if metadata.get("title", "").lower() == full_title.lower()
+        ]
+        if not matching_indices:
+            print(f"No documents found with title '{full_title}'")
+            continue
+
+        for i in matching_indices:
+            doc_id = all_docs["ids"][i]
+            original_doc = all_docs["documents"][i]
+            original_metadata = all_docs["metadatas"][i]
+            updated_metadata = original_metadata.copy()
+            for dept in ALL_DEPARTMENTS:
+                updated_metadata[dept] = "True" if dept in departments else "False"
+            for country in ALL_COUNTRIES:
+                updated_metadata[country] = "True" if country in countries else "False"
+            if "uploaded_by" not in updated_metadata:
+                updated_metadata["uploaded_by"] = file_metadata.get("uploaded_by", "")
+            if "upload_time" not in updated_metadata:
+                updated_metadata["upload_time"] = file_metadata.get("upload_time", datetime.now().isoformat())
+            chroma_collection.update(
+                ids=[doc_id],
+                documents=[original_doc],
+                metadatas=[updated_metadata]
+            )
+            print(f"Updated: {doc_id} ({original_metadata.get('title')})")
+            updated_any = True
+
+    if not updated_any:
+        print("No matching documents found for any of the tried extensions.")
+
+    # Update all .meta.json files with the same base name
+    meta_files = glob.glob(str(UPLOAD_DIR / f"{base_name}.*.meta.json"))
+    for meta_path in meta_files:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+        meta["departments"] = departments
+        meta["countries"] = countries
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2)

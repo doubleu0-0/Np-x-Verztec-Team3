@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ChevronUp, ChevronDown, MoreVertical, X, Filter } from 'lucide-react';
+import { ChevronUp, ChevronDown, MoreVertical, X, Filter, Loader } from 'lucide-react';
 
 const ALL_DEPARTMENTS = [
   "Marketing","Procurement","IT","Project Management","Human Resource","Admin & Operations","Business Development","Finance","Service Delivery"
@@ -15,7 +15,7 @@ function isAll(list, allList) {
   return list.length === allList.length;
 }
 
-const EditFileModal = ({ file, onClose, onSave, currentUser }) => {
+const EditFileModal = ({ file, onClose, onSave, currentUser, saving }) => {
   const [form, setForm] = useState({
     file_name: file.file_name || "",
     departments: file.departments || "",
@@ -135,14 +135,23 @@ const EditFileModal = ({ file, onClose, onSave, currentUser }) => {
               type="button"
               className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200"
               onClick={onClose}
+              disabled={saving}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded bg-yellow-500 text-black font-semibold hover:bg-yellow-600"
+              className="px-4 py-2 rounded bg-yellow-500 text-black font-semibold hover:bg-yellow-600 flex items-center justify-center"
+              disabled={saving}
             >
-              Save
+              {saving ? (
+                <>
+                  <Loader className="animate-spin w-4 h-4 mr-2" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
             </button>
           </div>
         </form>
@@ -165,6 +174,7 @@ export default function PolicyDocuments({ currentUser }) {
   const [showFilterPopup, setShowFilterPopup] = useState(false);
   const [selectedDepartments, setSelectedDepartments] = useState([]);
   const [selectedCountries, setSelectedCountries] = useState([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchFileList();
@@ -276,6 +286,44 @@ export default function PolicyDocuments({ currentUser }) {
 
   const closeEditModal = () => setEditFile(null);
 
+  const handleEditSave = async (updatedFile) => {
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const form = new FormData();
+
+      // Ensure departments is always an array
+      let departments = updatedFile.departments;
+      if (departments === "ALL") departments = ALL_DEPARTMENTS;
+      else if (typeof departments === "string") departments = [departments];
+
+      departments.forEach(dept => form.append("departments", dept));
+
+      // Ensure countries is always an array
+      let countries = updatedFile.countries;
+      if (countries === "ALL") countries = ALL_COUNTRIES;
+      else if (typeof countries === "string") countries = [countries];
+
+      countries.forEach(country => form.append("countries", country));
+
+      await axios.put(
+        `http://localhost:8000/update-file/${encodeURIComponent(updatedFile.file_name)}`,
+        form,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setEditFile(null);
+      fetchFileList(); // Refresh the list after update
+    } catch (err) {
+      alert("Failed to update file: " + (err?.response?.data?.detail || err.message));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="pt-1 pb-2">
       <div className="mb-2">
@@ -369,7 +417,12 @@ export default function PolicyDocuments({ currentUser }) {
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {loading ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">Loading files...</td>
+                <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader className="animate-spin w-6 h-6 text-yellow-500" />
+                    Loading files...
+                  </span>
+                </td>
               </tr>
             ) : paginatedFiles.length === 0 ? (
               <tr>
@@ -453,11 +506,9 @@ export default function PolicyDocuments({ currentUser }) {
         <EditFileModal
           file={editFile}
           onClose={closeEditModal}
-          onSave={(updatedFile) => {
-            setEditFile(null);
-            // Optionally update fileList state if needed
-          }}
-          currentUser={currentUser} // <-- Use the real currentUser prop
+          onSave={handleEditSave}
+          currentUser={currentUser}
+          saving={saving}
         />
       )}
 
