@@ -606,7 +606,7 @@ def list_files():
     return [f.name for f in folder_path.iterdir() if f.is_file()]
 
 @app.delete("/delete-file/{filename}")
-def delete_file(filename: str):
+def delete_file(filename: str, current_user: dict = Depends(get_current_user)):
     folder_path = Path(__file__).resolve().parent.parent / "pipeline" / "data" / "raw_data"
     file_path = folder_path / filename
 
@@ -614,11 +614,55 @@ def delete_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     try:
+        # Delete from ChromaDB and meta files first
+        delete_docs_by_filename(filename)
+
+        # --- Log deletion to file_deletion_logs and delete from DB ---
+        conn = get_db()
+        try:
+            with conn.cursor() as cursor:
+                # Fetch file info before deletion
+                cursor.execute("SELECT * FROM files WHERE file_name = %s", (filename,))
+                file_row = cursor.fetchone()
+                if not file_row:
+                    raise HTTPException(status_code=404, detail="File not found in database")
+
+                # Log deletion
+                cursor.execute("""
+                    INSERT INTO file_deletion_logs (
+                        deleted_file_name, deleted_file_type, department, access_level, file_path,
+                        countries, batch_id, uploaded_by_username, deleted_by_username, deleted_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    file_row["file_name"],
+                    file_row["file_type"],
+                    file_row["department"],
+                    file_row["access_level"],
+                    file_row["file_path"],
+                    file_row["countries"],
+                    file_row.get("batch_id"),
+                    # Get uploader username
+                    get_username_by_user_id(file_row["uploaded_by"], cursor),
+                    current_user.get("username"),
+                    datetime.now()
+                ))
+
+                # Delete from files table
+                cursor.execute("DELETE FROM files WHERE file_name = %s", (filename,))
+            conn.commit()
+        finally:
+            conn.close()
+
+        # Delete the file from disk
         file_path.unlink()
         return JSONResponse(content={"message": f"Deleted '{filename}' successfully"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+def get_username_by_user_id(user_id, cursor):
+    cursor.execute("SELECT username FROM users WHERE user_id = %s", (user_id,))
+    user = cursor.fetchone()
+    return user["username"] if user else None
 
 # === Models ===
 class Role(str, Enum):
@@ -1381,6 +1425,7 @@ async def update_file_metadata(
     - Updates all sidecar .meta.json files with the same base name
     - Updates the database record
     - Updates ChromaDB document metadata for this file
+    - Logs changes to file_update_logs
     """
     file_path = UPLOAD_DIR / filename
     meta_path = file_path.with_suffix(file_path.suffix + ".meta.json")
@@ -1393,14 +1438,60 @@ async def update_file_metadata(
     meta["departments"] = departments
     meta["countries"] = countries
 
-    # Update DB
+    # Update DB and log changes
     conn = get_db()
     try:
         with conn.cursor() as cursor:
+            # Get file_id and current values for logging
+            cursor.execute("SELECT file_id, departments, countries FROM files WHERE file_name = %s", (filename,))
+            file_row = cursor.fetchone()
+            if not file_row:
+                raise HTTPException(status_code=404, detail="File not found in database")
+            file_id = file_row["file_id"]
+            old_departments = file_row["departments"] or ""
+            old_countries = file_row["countries"] or ""
+
+            # Update the files table
             cursor.execute(
                 "UPDATE files SET departments=%s, countries=%s WHERE file_name=%s",
                 (",".join(departments), ",".join(countries), filename)
             )
+
+            now = datetime.now()
+            # Log changes for departments
+            if old_departments != ",".join(departments):
+                cursor.execute(
+                    """
+                    INSERT INTO file_update_logs (file_id, file_name, changed_by_username, field_name, old_value, new_value, changed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        file_id,
+                        filename,
+                        current_user.get("username"),
+                        "departments",
+                        old_departments,
+                        ",".join(departments),
+                        now
+                    )
+                )
+            # Log changes for countries
+            if old_countries != ",".join(countries):
+                cursor.execute(
+                    """
+                    INSERT INTO file_update_logs (file_id, file_name, changed_by_username, field_name, old_value, new_value, changed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        file_id,
+                        filename,
+                        current_user.get("username"),
+                        "countries",
+                        old_countries,
+                        ",".join(countries),
+                        now
+                    )
+                )
         conn.commit()
     finally:
         conn.close()
@@ -1485,3 +1576,51 @@ def update_docs_with_metadata(filename, file_metadata):
         meta["countries"] = countries
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2)
+
+def delete_docs_by_filename(filename):
+    """
+    Deletes all Chroma documents whose 'title' in metadata matches the given filename 
+    (tries all common extensions). Also deletes any associated .meta.json files.
+    """
+    import os
+    import glob
+
+    # Extract base filename without extension
+    base_name = os.path.splitext(filename)[0]
+    possible_exts = [".pdf", ".doc", ".docx", ".txt"]
+    deleted_any = False
+
+    # Check ChromaDB collection
+    all_docs = chroma_collection.get(limit=1000)
+
+    for ext in possible_exts:
+        full_title = f"{base_name}{ext}"
+        # Collect all matching doc IDs
+        matching_ids = [
+            all_docs["ids"][i]
+            for i, metadata in enumerate(all_docs["metadatas"])
+            if metadata.get("title", "").lower() == full_title.lower()
+        ]
+
+        if not matching_ids:
+            print(f"No documents found with title '{full_title}'")
+            continue
+
+        # Delete all matching docs at once
+        chroma_collection.delete(ids=matching_ids)
+        print(f"Deleted documents with title '{full_title}' (IDs: {matching_ids})")
+        deleted_any = True
+
+    if deleted_any:
+        print("Deletion successful.")
+    else:
+        print("No documents found for deletion.")
+
+    # Delete associated .meta.json files
+    meta_files = glob.glob(str(UPLOAD_DIR / f"{base_name}.*.meta.json"))
+    for meta_path in meta_files:
+        try:
+            os.remove(meta_path)
+            print(f"Deleted meta file: {meta_path}")
+        except Exception as e:
+            print(f"Error deleting meta file {meta_path}: {e}")

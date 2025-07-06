@@ -192,6 +192,8 @@ export default function UserManagement({ isDarkMode, currentUser }) {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [menuOpen, setMenuOpen] = useState(null); // user_id of open menu
   const [editUser, setEditUser] = useState(null);
+  const [deleteUser, setDeleteUser] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [usersPerPage, setUsersPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -297,7 +299,7 @@ export default function UserManagement({ isDarkMode, currentUser }) {
     setMenuOpen(null);
   };
 
-  const handleDelete = async (user) => {
+  const handleDelete = (user) => {
     // Prevent deleting yourself
     if (String(user.user_id) === String(currentUser?.user_id)) {
       alert("You cannot delete your own account.");
@@ -308,23 +310,7 @@ export default function UserManagement({ isDarkMode, currentUser }) {
       return;
     }
     setMenuOpen(null);
-    if (window.confirm(`Delete user "${user.username}"?`)) {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:8000/users/${user.user_id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          setUsers(users.filter(u => u.user_id !== user.user_id));
-        } else {
-          const data = await response.json();
-          alert(data.detail || 'Failed to delete user.');
-        }
-      } catch (err) {
-        alert('Failed to delete user.');
-      }
-    }
+    setDeleteUser(user);
   };
 
   const handleEditSave = async (updatedUser) => {
@@ -582,6 +568,67 @@ export default function UserManagement({ isDarkMode, currentUser }) {
           onSave={handleEditSave}
           currentUser={currentUser}
         />
+      )}
+      {deleteUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md relative">
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={() => setDeleteUser(null)}
+              disabled={deleting}
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Delete User</h2>
+            <p className="mb-6 text-gray-700 dark:text-gray-300">
+              Are you sure you want to delete <span className="font-bold">{deleteUser.username}</span>?<br />
+              This action <span className="text-red-600 font-semibold">cannot be undone</span>.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200"
+                onClick={() => setDeleteUser(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-red-600 text-white font-semibold hover:bg-red-700 flex items-center justify-center"
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`http://localhost:8000/users/${deleteUser.user_id}`, {
+                      method: 'DELETE',
+                      headers: { Authorization: `Bearer ${token}` },
+                    });
+                    if (response.ok) {
+                      setUsers(users.filter(u => u.user_id !== deleteUser.user_id));
+                      setDeleteUser(null);
+                    } else {
+                      const data = await response.json();
+                      alert(data.detail || 'Failed to delete user.');
+                    }
+                  } catch (err) {
+                    alert('Failed to delete user.');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <RefreshCw className="animate-spin w-4 h-4 mr-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

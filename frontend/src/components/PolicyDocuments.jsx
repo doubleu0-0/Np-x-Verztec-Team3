@@ -175,6 +175,8 @@ export default function PolicyDocuments({ currentUser }) {
   const [selectedDepartments, setSelectedDepartments] = useState([]);
   const [selectedCountries, setSelectedCountries] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [deleteFile, setDeleteFile] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchFileList();
@@ -279,9 +281,18 @@ export default function PolicyDocuments({ currentUser }) {
     setEditFile(file);
   };
 
-  const handleDelete = (file) => {
+  const handleDelete = async (file) => {
     setMenuOpen(null);
-    alert(`Delete file: ${file.file_name}`);
+    if (!window.confirm(`Are you sure you want to delete "${file.file_name}"? This cannot be undone.`)) return;
+    const token = localStorage.getItem('token');
+    try {
+      await axios.delete(`http://localhost:8000/delete-file/${encodeURIComponent(file.file_name)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchFileList(); // Refresh the list after deletion
+    } catch (err) {
+      alert("Failed to delete file: " + (err?.response?.data?.detail || err.message));
+    }
   };
 
   const closeEditModal = () => setEditFile(null);
@@ -466,7 +477,7 @@ export default function PolicyDocuments({ currentUser }) {
                           </button>
                           <button
                             className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-xl"
-                            onClick={() => handleDelete(file)}
+                            onClick={() => setDeleteFile(file)}
                           >
                             Delete
                           </button>
@@ -604,6 +615,63 @@ export default function PolicyDocuments({ currentUser }) {
                 onClick={() => setShowFilterPopup(false)}
               >
                 Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md relative">
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={() => setDeleteFile(null)}
+              disabled={deleting}
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Delete File</h2>
+            <p className="mb-6 text-gray-700 dark:text-gray-300">
+              Are you sure you want to delete <span className="font-bold">{deleteFile.file_name}</span>?<br />
+              This action <span className="text-red-600 font-semibold">cannot be undone</span>.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200"
+                onClick={() => setDeleteFile(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-red-600 text-white font-semibold hover:bg-red-700 flex items-center justify-center"
+                onClick={async () => {
+                  setDeleting(true);
+                  const token = localStorage.getItem('token');
+                  try {
+                    await axios.delete(`http://localhost:8000/delete-file/${encodeURIComponent(deleteFile.file_name)}`, {
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setDeleteFile(null);
+                    fetchFileList();
+                  } catch (err) {
+                    alert("Failed to delete file: " + (err?.response?.data?.detail || err.message));
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <Loader className="animate-spin w-4 h-4 mr-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
               </button>
             </div>
           </div>
