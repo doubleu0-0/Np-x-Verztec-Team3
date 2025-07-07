@@ -16,7 +16,11 @@
   - Windows ((powershell)): `.\venv\Scripts\activate.ps1`
 - Install the dependencies from [requirements.txt](./backend/requirements.txt)
   - `pip install -r requirements.txt`
-- Edit the database credentials in Watcher.py and backend\main.py
+- Create a .env file with
+  - DB_HOST=
+  - DB_USER=
+  - DB_PASS=
+  - DB_NAME=
 
 ### Run the backend
 
@@ -44,3 +48,18 @@
 
 - `npm run dev`
 - click on the local vite url shown
+
+
+
+
+## Redis
+
+### Setup
+
+- Redis (Download msi from https://github.com/tporadowski/redis/releases)
+- Select default settings during initial Redis setup
+
+### Run Redis
+
+- `cd "C:\Program Files\Redis"`
+- `.\redis-server.exe --port 6380`
