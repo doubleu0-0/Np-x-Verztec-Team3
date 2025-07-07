@@ -7,15 +7,42 @@ import white_logo from '@/assets/images/logo-white.png';
 import ModelSelector from '@/components/ModelSelector';
 
 
-function Chatbot({ userProfile }) {
+function Chatbot({ userProfile, selectedLogId = null }) {
   const [messages, setMessages] = useImmer([]); // Stores chat messages
   const [newMessage, setNewMessage] = useState(''); // Stores the current input message
   const [status, setStatus] = useState(''); // Which phase the bot is in (Searching database, preprocessing, etc)
   const [selectedModel, setSelectedModel] = useState('llama3.2:latest');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [loadingLog, setLoadingLog] = useState(false); 
   const messagesEndRef = useRef(null); // Just for auto scrolling
 
   const isLoading = messages.length && messages[messages.length - 1].loading;
+
+    // Chat log loading logic
+  useEffect(() => {
+    if (!selectedLogId) return;
+
+    const fetchLog = async () => {
+      setLoadingLog(true);
+      setStatus('🔄 Loading previous chat...');
+      try {
+        const res = await fetch(`http://localhost:8000/chat-log/${selectedLogId}`);
+        if (!res.ok) throw new Error(`Failed to load chat log: ${res.status}`);
+        const data = await res.json();
+        if (!data.messages) throw new Error('Invalid data format');
+
+        setMessages(data.messages);
+        setStatus('✅ Chat loaded.');
+      } catch (err) {
+        console.error(err);
+        setStatus(`✗ Could not load chat: ${err.message}`);
+      } finally {
+        setLoadingLog(false);
+      }
+    };
+
+    fetchLog();
+  }, [selectedLogId, setMessages]);
 
   // Auto scrolling
   useEffect(() => {
@@ -43,7 +70,6 @@ function Chatbot({ userProfile }) {
     setStatus("Processing your message...");
 
     try {
-      // Step 1: Process the full message to extract questions
       const token = localStorage.getItem('token');
       const res = await fetch('http://localhost:8000/process', {
         method: 'POST',
@@ -55,22 +81,70 @@ function Chatbot({ userProfile }) {
       });
 
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const data = await res.json();
-      const parsedQuestions = data.questions || [];
+      const contentType = res.headers.get("content-type");
+      let parsedQuestions = [];
 
-      if (parsedQuestions.length === 0) {
-        setStatus("No HR-related questions found.");
+      if (contentType && contentType.includes("application/json")) {
+        // Read the stream as text, then parse JSON
+        let text = "";
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+        while (!done) {
+          const { value, done: doneReading } = await reader.read();
+          done = doneReading;
+          if (value) text += decoder.decode(value);
+        }
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          setStatus("✗ Error: Invalid JSON from server.");
+          return;
+        }
+        parsedQuestions = data.questions || [];
+        // Only call /stream if there are questions
+        if (parsedQuestions.length === 0) {
+          setStatus("No HR-related questions found.");
+          setMessages(draft => {
+            draft.push({ role: 'assistant', content: "I'm here to help with HR-related concerns like leave, policies, or claims!" });
+          });
+          return;
+        }
+      } else {
+        // Fallback streaming response (not questions)
+        let text = "";
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+        let assistantIndex = null;
+
         setMessages(draft => {
-          draft.push({ role: 'assistant', content: data.fallback || "I'm here to help with HR-related concerns like leave, policies, or claims!" });
+          assistantIndex = draft.length;
+          draft.push({ role: 'assistant', content: '', loading: true });
         });
-        return;
+
+        while (!done) {
+          const { value, done: doneReading } = await reader.read();
+          done = doneReading;
+          if (value) {
+            const chunk = decoder.decode(value);
+            text += chunk;
+            setMessages(draft => {
+              if (draft[assistantIndex]) draft[assistantIndex].content += chunk;
+            });
+          }
+        }
+
+        setMessages(draft => {
+          if (draft[assistantIndex]) draft[assistantIndex].loading = false;
+        });
+        setStatus("");
+        return; // Do NOT call /stream
       }
 
       setStatus(`Extracted ${parsedQuestions.length} question(s).`);
-
       const assistantIndexes = [];
-
-      // Step 2: Add original message and extracted questions
       setMessages(draft => {
         parsedQuestions.forEach(() => {
           const index = draft.length;
@@ -78,8 +152,7 @@ function Chatbot({ userProfile }) {
           assistantIndexes.push(index);
         });
       });
-      
-      // Step 3: Stream answer for each question
+
       parsedQuestions.forEach((q, i) => {
         setTimeout(() => {
           streamAnswer(q, assistantIndexes[i]);
@@ -93,6 +166,7 @@ function Chatbot({ userProfile }) {
 
   async function streamAnswer(questionText, assistantIndex) {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('http://localhost:8000/stream', {
         method: 'POST',
         headers: {
@@ -105,34 +179,28 @@ function Chatbot({ userProfile }) {
       if (!res.ok) throw new Error(`Stream error: ${res.status}`);
 
       const reader = res.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      setStatus("🔁 Starting stream for: " + questionText);
+      const decoder = new TextDecoder();
+      let done = false;
+      let gotAny = false;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-
-        setMessages(draft => {
-          if (!draft[assistantIndex]) {
-            console.warn("Invalid assistant index:", assistantIndex);
-            return;
-          }
-
-          // Force re-render by replacing the entire object
-          draft[assistantIndex] = {
-            ...draft[assistantIndex],
-            content: draft[assistantIndex].content + chunk,
-          };
-        });
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        if (value) {
+          gotAny = true;
+          const chunk = decoder.decode(value);
+          setMessages(draft => {
+            if (!draft[assistantIndex]) return;
+            draft[assistantIndex].content += chunk;
+          });
+        }
       }
 
       setMessages(draft => {
         if (!draft[assistantIndex]) return;
         draft[assistantIndex].loading = false;
       });
-
+      
       setStatus("Done :)");
     } catch (err) {
       setStatus(`✗ Stream error: ${err.message}`);

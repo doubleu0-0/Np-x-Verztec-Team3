@@ -1,15 +1,18 @@
-// src/components/GLBAvatar.jsx
 import React, { Suspense, useRef, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { FBXLoader } from 'three-stdlib'
+import { useTTS } from '@/contexts/TTSContext'
 
-function AvatarModel() {
+function AvatarModel({ selectedAvatar }) {
   const group = useRef()
-  const gltf = useGLTF('/human_avatar/avatar1.glb')
+  const gltf = useGLTF(`/human_avatar/${selectedAvatar}.glb`)
   const mixerRef = useRef()
+  const talkingMeshes = useRef([])
+  const { isSpeaking, visemeData } = useTTS()
 
+  // Load idle FBX animation
   useEffect(() => {
     const loader = new FBXLoader()
     loader.load('/human_avatar/idle.fbx', (fbx) => {
@@ -19,10 +22,67 @@ function AvatarModel() {
     })
   }, [gltf.scene])
 
+  // Collect meshes with morph targets for lip sync
+  useEffect(() => {
+    gltf.scene.traverse((child) => {
+      if (child.isMesh && child.morphTargetDictionary) {
+        const morphTargets = {};
+        
+        // Simple mapping for basic mouth movement
+        const morphMappings = {
+          'mouthOpen': 'mouthOpen',
+          'mouth_open': 'mouthOpen',
+          'MouthOpen': 'mouthOpen',
+          'Mouth_Open': 'mouthOpen',
+          'jawOpen': 'jawOpen',
+          'jaw_open': 'jawOpen',
+          'JawOpen': 'jawOpen',
+          'Jaw_Open': 'jawOpen',
+        };
+        
+        Object.keys(child.morphTargetDictionary).forEach(morphName => {
+          const mappedName = morphMappings[morphName];
+          if (mappedName) {
+            morphTargets[mappedName] = child.morphTargetDictionary[morphName];
+          }
+        });
+        
+        if (Object.keys(morphTargets).length > 0) {
+          talkingMeshes.current.push({ mesh: child, morphTargets });
+          console.log(`Found mesh with morph targets:`, Object.keys(morphTargets));
+        }
+      }
+    })
+  }, [gltf.scene])
+
+  // Simple mouth animation when speaking
   useFrame((state, delta) => {
-    if (mixerRef.current) {
-      mixerRef.current.update(delta)
-    }
+    if (mixerRef.current) mixerRef.current.update(delta)
+
+    // Apply mouth movement to all meshes
+    talkingMeshes.current.forEach(({ mesh, morphTargets }) => {
+      if (mesh.morphTargetInfluences) {
+        if (isSpeaking) {
+          // Basic mouth opening when speaking
+          if (morphTargets.mouthOpen !== undefined) {
+            mesh.morphTargetInfluences[morphTargets.mouthOpen] = visemeData.mouthOpen || 0.3;
+          }
+          
+          if (morphTargets.jawOpen !== undefined) {
+            mesh.morphTargetInfluences[morphTargets.jawOpen] = visemeData.jawOpen || 0.2;
+          }
+        } else {
+          // Close mouth when not speaking
+          if (morphTargets.mouthOpen !== undefined) {
+            mesh.morphTargetInfluences[morphTargets.mouthOpen] = 0.05;
+          }
+          
+          if (morphTargets.jawOpen !== undefined) {
+            mesh.morphTargetInfluences[morphTargets.jawOpen] = 0;
+          }
+        }
+      }
+    });
   })
 
   return (
@@ -32,21 +92,14 @@ function AvatarModel() {
   )
 }
 
-export default function GLBAvatar() {
+export default function GLBAvatar({ selectedAvatar, onAvatarChange, className }) {
   return (
-    <div style={{
-      width: '35vw',          // 35% of viewport width
-      height: '60vh',         // 60% of viewport height
-      position: 'fixed',      // fixed so it stays on screen
-      top: '29vh',            // vertical offset from top
-      right: 20,               // pinned to the right
-      backgroundColor: 'transparent' // background to separate from page
-    }}>
-      <Canvas camera={{ position: [0, 0.15, 0.8], fov: 50 }}>
-        <ambientLight intensity={0.5} />
+    <div className={`${className}`}>      
+      <Canvas camera={{ position: [0, 0.2, 0.8], fov: 50 }}>
+        <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <Suspense fallback={null}>
-          <AvatarModel />
+          <AvatarModel selectedAvatar={selectedAvatar} />
         </Suspense>
         <OrbitControls 
           enableZoom={false}

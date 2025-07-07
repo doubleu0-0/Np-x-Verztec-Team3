@@ -1,12 +1,16 @@
 import Markdown from 'react-markdown';
 import useAutoScroll from '@/hooks/useAutoScroll';
 import Spinner from '@/components/Spinner';
+import MessageActions from '@/components/MessageActions';
 import userIcon from '@/assets/images/user.svg';
 import errorIcon from '@/assets/images/error.svg';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useTTS } from '@/contexts/TTSContext';
 
 function ChatMessages({ messages, isLoading }) {
   const bottomRef = useRef(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { speakText } = useTTS(); // Get the speakText function from context
 
   useEffect(() => {
     if (bottomRef.current) {
@@ -14,58 +18,26 @@ function ChatMessages({ messages, isLoading }) {
     }
   }, [messages]);
 
-  // Default Male Voice
-  // useEffect(() => {
-  //   if (!messages.length) return;
-  //   const last = messages[messages.length - 1];
-
-  //   if (last.role === 'assistant' && last.content && !last.loading) {
-  //     const utterance = new SpeechSynthesisUtterance(last.content);
-  //     utterance.lang = 'en-US';
-  //     speechSynthesis.speak(utterance);
-  //   }
-  // }, [messages]);
-
-  // Default Female Voice
+  // Use the TTS context instead of direct speechSynthesis
   useEffect(() => {
     if (!messages.length) return;
     const last = messages[messages.length - 1];
 
     if (last.role === 'assistant' && last.content && !last.loading) {
-      const speakWithFemaleVoice = () => {
-        const voices = speechSynthesis.getVoices();
-        
-        // Try to find a female-sounding English voice
-        const femaleVoice = voices.find(
-          (v) =>
-            v.lang === 'en-US' &&
-            (v.name.toLowerCase().includes('female') ||
-            v.name.toLowerCase().includes('zira') || // Windows
-            v.name.toLowerCase().includes('samantha') || // macOS
-            v.name.toLowerCase().includes('google us english')) // Chrome
-        ) || voices.find(v => v.lang === 'en-US'); // fallback
-
-        const utterance = new SpeechSynthesisUtterance(last.content);
-        utterance.voice = femaleVoice;
-        utterance.lang = 'en-US';
-        utterance.pitch = 1;
-        utterance.rate = 1;
-        speechSynthesis.speak(utterance);
-      };
-
-      // Handle case when voices might not be ready yet
-      if (speechSynthesis.getVoices().length) {
-        speakWithFemaleVoice();
-      } else {
-        speechSynthesis.onvoiceschanged = () => {
-          speakWithFemaleVoice();
-        };
-      }
+      speakText(last.content); // Use the context function
     }
-  }, [messages]);
+  }, [messages, speakText]);
+
+  // Check for dark mode
+  useEffect(() => {
+    const checkDark = () => setIsDarkMode(document.documentElement.classList.contains('dark'));
+    checkDark();
+    const observer = new MutationObserver(checkDark);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    // changed this line below
     <div className='flex-1 overflow-y-auto min-h-0 space-y-4 p-4'>
       {messages.map(({ role, content, loading, error }, idx) => (
         <div
@@ -83,7 +55,7 @@ function ChatMessages({ messages, isLoading }) {
               alt='user'
             />
           )}
-          <div>
+          <div className="flex-1">
             <div className='markdown-container'>
               {(loading && !content) ? <Spinner />
                 : (role === 'assistant')
@@ -97,6 +69,11 @@ function ChatMessages({ messages, isLoading }) {
                 <span>Error generating the response</span>
               </div>
             )}
+
+            {/* Add action buttons for assistant messages that are complete */}
+            {role === 'assistant' && content && !loading && !error && (
+              <MessageActions content={content} isDarkMode={isDarkMode} />
+            )}            
           </div>
         </div>
       ))}
