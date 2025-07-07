@@ -1,9 +1,26 @@
 {
   "departments": [
-    "Marketing,Procurement,IT,Project Management,Human Resource,Admin & Operations,Business Development,Finance,Service Delivery"
+    "Marketing",
+    "Procurement",
+    "IT",
+    "Project Management",
+    "Human Resource",
+    "Admin & Operations",
+    "Business Development",
+    "Finance",
+    "Service Delivery"
   ],
   "countries": [
-    "United Kingdom"
+    "Singapore",
+    "Japan",
+    "Vietnam",
+    "United Kingdom",
+    "Myanmar",
+    "United States",
+    "Indonesia",
+    "Thailand",
+    "Korea",
+    "China"
   ],
   "uploaded_by": "e",
   "batch_id": "20250702_030731_066204",

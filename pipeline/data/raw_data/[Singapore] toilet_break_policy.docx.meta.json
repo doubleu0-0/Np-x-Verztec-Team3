@@ -1,6 +1,14 @@
 {
   "departments": [
-    "Marketing,Procurement,IT,Project Management,Human Resource,Admin & Operations,Business Development,Finance,Service Delivery"
+    "Marketing",
+    "Procurement",
+    "IT",
+    "Project Management",
+    "Human Resource",
+    "Admin & Operations",
+    "Business Development",
+    "Finance",
+    "Service Delivery"
   ],
   "countries": [
     "Vietnam"

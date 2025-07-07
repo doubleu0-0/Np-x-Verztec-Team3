@@ -1522,9 +1522,12 @@ def update_docs_with_metadata(filename, file_metadata):
         "Korea", "China", "Japan", "Vietnam", "Myanmar"
     ]
 
-    # Use the provided lists
-    departments = file_metadata.get("departments", [])
-    countries = file_metadata.get("countries", [])
+    # Normalize the metadata format first
+    normalized_metadata = normalize_metadata_format(file_metadata)
+    
+    # Use the normalized lists
+    departments = normalized_metadata.get("departments", [])
+    countries = normalized_metadata.get("countries", [])
 
     # Extract base filename without extension
     base_name = os.path.splitext(filename)[0]
@@ -1624,3 +1627,49 @@ def delete_docs_by_filename(filename):
             print(f"Deleted meta file: {meta_path}")
         except Exception as e:
             print(f"Error deleting meta file {meta_path}: {e}")
+
+def normalize_metadata_format(metadata):
+    """
+    Normalize metadata format to ensure departments and countries are arrays of strings.
+    Handles both old format (comma-separated strings) and new format (arrays).
+    """
+    if not isinstance(metadata, dict):
+        return metadata
+    
+    normalized = metadata.copy()
+    
+    # Fix departments
+    if "departments" in normalized:
+        deps = normalized["departments"]
+        if isinstance(deps, str):
+            # Single string - split by comma
+            normalized["departments"] = [dept.strip() for dept in deps.split(",") if dept.strip()]
+        elif isinstance(deps, list):
+            # List - check if it contains comma-separated strings
+            new_departments = []
+            for item in deps:
+                if isinstance(item, str) and "," in item:
+                    # Split comma-separated string
+                    new_departments.extend([dept.strip() for dept in item.split(",") if dept.strip()])
+                elif isinstance(item, str):
+                    new_departments.append(item.strip())
+            normalized["departments"] = new_departments
+    
+    # Fix countries
+    if "countries" in normalized:
+        countries = normalized["countries"]
+        if isinstance(countries, str):
+            # Single string - split by comma
+            normalized["countries"] = [country.strip() for country in countries.split(",") if country.strip()]
+        elif isinstance(countries, list):
+            # List - check if it contains comma-separated strings
+            new_countries = []
+            for item in countries:
+                if isinstance(item, str) and "," in item:
+                    # Split comma-separated string
+                    new_countries.extend([country.strip() for country in item.split(",") if country.strip()])
+                elif isinstance(item, str):
+                    new_countries.append(item.strip())
+            normalized["countries"] = new_countries
+    
+    return normalized
