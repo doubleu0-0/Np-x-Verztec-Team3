@@ -7,11 +7,10 @@ import white_logo from '@/assets/images/logo-white.png';
 import ModelSelector from '@/components/ModelSelector';
 
 
-function Chatbot({ userProfile, selectedLogId = null }) {
+function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId = null, onNewChatCreated }) {
   const [messages, setMessages] = useImmer([]); // Stores chat messages
   const [newMessage, setNewMessage] = useState(''); // Stores the current input message
   const [status, setStatus] = useState(''); // Which phase the bot is in (Searching database, preprocessing, etc)
-  const [selectedModel, setSelectedModel] = useState('llama3.2:latest');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [loadingLog, setLoadingLog] = useState(false); 
   const messagesEndRef = useRef(null); // Just for auto scrolling
@@ -61,6 +60,11 @@ function Chatbot({ userProfile, selectedLogId = null }) {
   async function submitNewMessage() {
     const trimmedMessage = newMessage.trim();
     if (!trimmedMessage || isLoading) return;
+
+    // Call this when starting a new chat
+    if (messages.length === 0 && onNewChatCreated) {
+      onNewChatCreated();
+    }
 
     setMessages(draft => {
       draft.push({ role: 'user', content: trimmedMessage });
