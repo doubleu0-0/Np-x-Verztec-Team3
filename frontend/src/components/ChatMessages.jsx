@@ -1,12 +1,14 @@
 import Markdown from 'react-markdown';
 import useAutoScroll from '@/hooks/useAutoScroll';
 import Spinner from '@/components/Spinner';
+import MessageActions from '@/components/MessageActions';
 import userIcon from '@/assets/images/user.svg';
 import errorIcon from '@/assets/images/error.svg';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 function ChatMessages({ messages, isLoading }) {
   const bottomRef = useRef(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     if (bottomRef.current) {
@@ -14,17 +16,14 @@ function ChatMessages({ messages, isLoading }) {
     }
   }, [messages]);
 
-  // Default Male Voice
-  // useEffect(() => {
-  //   if (!messages.length) return;
-  //   const last = messages[messages.length - 1];
-
-  //   if (last.role === 'assistant' && last.content && !last.loading) {
-  //     const utterance = new SpeechSynthesisUtterance(last.content);
-  //     utterance.lang = 'en-US';
-  //     speechSynthesis.speak(utterance);
-  //   }
-  // }, [messages]);
+  // Check for dark mode
+  useEffect(() => {
+    const checkDark = () => setIsDarkMode(document.documentElement.classList.contains('dark'));
+    checkDark();
+    const observer = new MutationObserver(checkDark);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   // Default Female Voice
   useEffect(() => {
@@ -69,7 +68,6 @@ function ChatMessages({ messages, isLoading }) {
   }, [messages]);
 
   return (
-    // changed this line below
     <div className='flex-1 overflow-y-auto min-h-0 space-y-4 p-4'>
       {messages.map(({ role, content, loading, error }, idx) => (
         <div
@@ -87,7 +85,7 @@ function ChatMessages({ messages, isLoading }) {
               alt='user'
             />
           )}
-          <div>
+          <div className="flex-1">
             <div className='markdown-container'>
               {(loading && !content) ? <Spinner />
                 : (role === 'assistant')
@@ -100,6 +98,11 @@ function ChatMessages({ messages, isLoading }) {
                 <img className='h-5 w-5' src={errorIcon} alt='error' />
                 <span>Error generating the response</span>
               </div>
+            )}
+            
+            {/* Add action buttons for assistant messages that are complete */}
+            {role === 'assistant' && content && !loading && !error && (
+              <MessageActions content={content} isDarkMode={isDarkMode} />
             )}
           </div>
         </div>
