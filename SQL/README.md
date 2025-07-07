@@ -1,0 +1,1 @@
+This folder stores all the SQL code required to create the database.
