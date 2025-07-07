@@ -352,6 +352,44 @@ export default function UserManagement({ isDarkMode, currentUser }) {
     fetchUsers();
   };
 
+  const handleResetPassword = async (user) => {
+    if (window.confirm(`Are you sure you want to reset the password for ${user.username}? They will receive a temporary password via email.`)) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:8000/reset-password/${user.user_id}`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          alert(`✅ ${data.message}`);
+          
+          // If email failed, show the temporary password
+          if (data.temp_password) {
+            const showPassword = window.confirm(
+              "Email delivery failed. Would you like to see the temporary password to provide manually?"
+            );
+            if (showPassword) {
+              prompt("Temporary Password (expires in 24 hours):", data.temp_password);
+            }
+          }
+        } else {
+          const errorData = await response.json();
+          alert(`❌ Failed to reset password: ${errorData.detail}`);
+        }
+      } catch (error) {
+        console.error('Error resetting password:', error);
+        alert('❌ Failed to reset password. Please try again.');
+      }
+      setMenuOpen(null);
+    } else {
+      setMenuOpen(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -406,133 +444,138 @@ export default function UserManagement({ isDarkMode, currentUser }) {
         </div>
       </div>
 
-      {/* Users Table */}
+      {/* Users Table - Remove horizontal scrolling */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden ml-0">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 w-40 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                    onClick={() => handleSort('username')}>
-                  <div className="flex items-center gap-1">
-                    Username
-                    {getSortIcon('username')}
+        {/* Remove overflow-x-auto wrapper */}
+        <table className="w-full table-fixed">
+          <thead className="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th className="px-6 py-3 w-36 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  onClick={() => handleSort('username')}>
+                <div className="flex items-center gap-1">
+                  Username
+                  {getSortIcon('username')}
+                </div>
+              </th>
+              <th className="px-4 py-3 w-48 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  onClick={() => handleSort('email')}>
+                <div className="flex items-center gap-1">
+                  Email
+                  {getSortIcon('email')}
+                </div>
+              </th>
+              <th className="px-4 py-3 w-20 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  onClick={() => handleSort('role')}>
+                <div className="flex items-center gap-1">
+                  Role
+                  {getSortIcon('role')}
+                </div>
+              </th>
+              <th className="px-4 py-3 w-28 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  onClick={() => handleSort('department')}>
+                <div className="flex items-center gap-1">
+                  Department
+                  {getSortIcon('department')}
+                </div>
+              </th>
+              <th className="px-4 py-3 w-28 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  onClick={() => handleSort('country')}>
+                <div className="flex items-center gap-1">
+                  Country
+                  {getSortIcon('country')}
+                </div>
+              </th>
+              <th className="px-4 py-3 w-24 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  onClick={() => handleSort('updated_at')}>
+                <div className="flex items-center gap-1">
+                  Updated
+                  {getSortIcon('updated_at')}
+                </div>
+              </th>
+              <th className="w-8 px-1 py-3 text-center"></th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {paginatedUsers.map((user) => (
+              <tr key={user.user_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <td className="px-6 py-4 w-36 truncate" title={user.username}>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{user.username}</span>
+                </td>
+                <td className="px-4 py-4 w-48 truncate" title={user.email}>
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    {user.email}
                   </div>
-                </th>
-                <th className="px-6 py-3 w-56 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                    onClick={() => handleSort('email')}>
-                  <div className="flex items-center gap-1">
-                    Email
-                    {getSortIcon('email')}
+                </td>
+                <td className="px-4 py-4 w-20" title={user.role}>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    user.role === 'ADMIN'
+                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      : user.role === 'MANAGER'
+                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                      : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                  }`}>
+                    {user.role}
+                  </span>
+                </td>
+                <td className="px-4 py-4 w-28 truncate" title={user.department}>
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    {user.department}
                   </div>
-                </th>
-                <th className="px-6 py-3 w-28 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                    onClick={() => handleSort('role')}>
-                  <div className="flex items-center gap-1">
-                    Role
-                    {getSortIcon('role')}
+                </td>
+                <td className="px-4 py-4 w-28 truncate" title={user.country}>
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    {user.country}
                   </div>
-                </th>
-                <th className="px-6 py-3 w-40 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                    onClick={() => handleSort('department')}>
-                  <div className="flex items-center gap-1">
-                    Department
-                    {getSortIcon('department')}
+                </td>
+                <td className="px-4 py-4 w-24 truncate" title={user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A'}>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A'}
                   </div>
-                </th>
-                <th className="px-6 py-3 w-40 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                    onClick={() => handleSort('country')}>
-                  <div className="flex items-center gap-1">
-                    Country
-                    {getSortIcon('country')}
-                  </div>
-                </th>
-                <th className="px-6 py-3 w-28 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                    onClick={() => handleSort('updated_at')}>
-                  <div className="flex items-center gap-1">
-                    Updated
-                    {getSortIcon('updated_at')}
-                  </div>
-                </th>
-                <th className="w-10 px-1 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {paginatedUsers.map((user) => (
-                <tr key={user.user_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 w-40 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.username}>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{user.username}</span>
-                  </td>
-                  <td className="px-6 py-4 w-56 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.email}>
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      {user.email}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 w-28 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.role}>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      user.role === 'ADMIN'
-                        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        : user.role === 'MANAGER'
-                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                        : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                    }`}>
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 w-40 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.department}>
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      {user.department}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 w-40 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.country}>
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      {user.country}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 w-28 max-w-xs truncate whitespace-nowrap overflow-hidden" title={user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A'}>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A'}
-                    </div>
-                  </td>
-                  <td className="w-10 px-1 py-4 relative" style={{ minWidth: 40 }}>
-                    {canManagerEditOrDelete(user) && user.user_id !== currentUser?.user_id && (
-                      <>
-                        <button
-                          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                          onClick={() => handleMenuOpen(user.user_id)}
-                        >
-                          <MoreVertical className="w-5 h-5" />
-                        </button>
-                        {menuOpen === user.user_id &&
-                          createPortal(
-                            <div
-                              className="fixed z-50 right-8 top-1/2 w-28 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl"
-                              style={{ transform: "translateY(-50%)" }}
+                </td>
+                <td className="w-8 px-1 py-4 text-center">
+                  {canManagerEditOrDelete(user) && user.user_id !== currentUser?.user_id && (
+                    <>
+                      <button
+                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                        onClick={() => handleMenuOpen(user.user_id)}
+                      >
+                        <MoreVertical className="w-5 h-5" />
+                      </button>
+                      {menuOpen === user.user_id &&
+                        createPortal(
+                          <div
+                            className="fixed z-50 right-8 top-1/2 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl"
+                            style={{ transform: "translateY(-50%)" }}
+                          >
+                            <button
+                              className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-xl text-gray-900 dark:text-white"
+                              onClick={() => handleEdit(user)}
                             >
-                              <button
-                                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-xl text-gray-900 dark:text-white"
-                                onClick={() => handleEdit(user)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-xl"
-                                onClick={() => handleDelete(user)}
-                              >
-                                Delete
-                              </button>
-                            </div>,
-                            document.body
-                          )
-                        }
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                              Edit
+                            </button>
+                            <button
+                              className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400"
+                              onClick={() => handleResetPassword(user)}
+                            >
+                              Reset Password
+                            </button>
+                            <button
+                              className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-xl"
+                              onClick={() => handleDelete(user)}
+                            >
+                              Delete
+                            </button>
+                          </div>,
+                          document.body
+                        )
+                      }
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
         {/* Pagination controls */}
         <div className="flex justify-end items-center gap-1 px-2 py-0 pb-2 text-xs">
           <button

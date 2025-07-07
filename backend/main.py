@@ -866,7 +866,7 @@ async def upload_xlsx(
                         detail=f"Department must be {current_user['department']}"
                     )
 
-            if not isinstance(email, str) or not email.endswith("@verztec.com"):
+            if not isinstance(email, str) or not email.endswith("@gmail.com"):
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid or missing email"

@@ -10,7 +10,6 @@ const MessageActions = ({ content, isDarkMode }) => {
 
   const languages = [
     { code: 'zh', name: 'Chinese (Simplified)', flag: '🇨🇳' },
-    { code: 'zh-TW', name: 'Chinese (Traditional)', flag: '🇹🇼' },
     { code: 'ms', name: 'Malay', flag: '🇲🇾' },
     { code: 'th', name: 'Thai', flag: '🇹🇭' },
     { code: 'id', name: 'Indonesian', flag: '🇮🇩' },
@@ -22,9 +21,6 @@ const MessageActions = ({ content, isDarkMode }) => {
     { code: 'fr', name: 'French', flag: '🇫🇷' },
     { code: 'de', name: 'German', flag: '🇩🇪' },
     { code: 'it', name: 'Italian', flag: '🇮🇹' },
-    { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
-    { code: 'ru', name: 'Russian', flag: '🇷🇺' },
-    { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
     { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
     { code: 'ta', name: 'Tamil', flag: '🇱🇰' },
   ];
