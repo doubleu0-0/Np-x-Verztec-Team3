@@ -1,0 +1,32 @@
+Quality Management System Transition Consultancy Work Schedule for Verztec Consulting Pte Ltd
+
+S/N: 1 
+
+Work Activity: Kick off meeting 
+Tentative Target Date: 7th Dec 2015 
+Remarks: This meeting is to get to know the work process of the Company and its existing QMS documentation and meet up with the key members of the QMS of the Company. 
+S/N: 2 
+
+Work Activity: Updating and revision of existing QMS documentation 
+Tentative Target Date: 10 Dec to 11 Jan 2015 
+Remarks: This updating of documentation will be done after the awareness training. The Consultant will review the existing Quality Manual and System Procedures and update in accordance to ISO 9001:2015 requirements. Process owners of each procedure will be contacted for any queries. 
+S/N: 3 
+
+Work Activity: Present updated QMS documentation 
+Tentative Target Date: 11 Jan 2016 
+Remarks: This meeting is to present the updated QMS documents and revise according to feedback from the process owner if any. 
+S/N: 3 
+
+Work Activity: Internal Auditor Training-ISO 9001:2015 Management System (1 Session) (1/2 - Day session) 
+Tentative Target Date: 18 Feb 2016 (2pm-6pm) 
+Remarks: This training will be conducted for the Company Internal Auditors. 
+S/N: 4 
+
+Work Activity: Internal Audit and closure of non-conformance. Guidance for MR meeting after Internal Audit if required. 
+Tentative Target Date: Sept/Oct 2016 
+Remarks: Internal Audit on the QMS will be carried out to check the implementation of procedures and identify areas for improvement. The Consultant will guide Auditee to close any NC raised during the audit. Provide guidance for the MR meeting. 
+S/N: 5 
+
+Work Activity: Closure of non-conformances raised during external audit 
+Tentative Target Date: (to be postponed to Nov 2016 as they are to be re-certified by then) 
+Remarks: The Consultant will guide the Auditee to close any NC raised during the external audit.

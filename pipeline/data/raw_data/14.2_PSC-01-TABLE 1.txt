@@ -1,0 +1,42 @@
+TITLE: EXTERNAL PROVIDER CONTROL PLAN 
+
+Category A: Direct Materials (Software) 
+
+Purchasing Method: Credit Terms / Signed Confirmation on vendor's/External Provider quotation. 
+Pre-Qualification (For New External Provider): ISO certified company preferred or based on Price, Samples, Service Level, Quality/Spec. 
+Responsibility for Pre-Qualification: Initiated by Purchaser, Approved by CEO/Operations PIC. 
+On-Going Appraisal (Existing External Provider): Yearly Assessment. 
+Responsibility for On-Going Appraisal: Purchaser. 
+Quality Control For Each Order: Receiving inspection of materials by Operations PIC in accordance with contract specifications or requirements specified in the Inspection & Test Plan (ITP). Reference: ITP/External Providers D.O. 
+Category B: Indirect Materials / Consumables 
+
+Purchasing Method: Credit Terms / Signed Confirmation on vendors/External Provider quotation. 
+Pre-Qualification (For New External Provider): ISO certified company preferred or based on Trial Order, Recommendation. 
+Responsibility for Pre-Qualification: Initiated by Purchaser, Approved by CEO/Operations PIC. 
+On-Going Appraisal (Existing External Provider): N.A. 
+Responsibility for On-Going Appraisal: N.A. 
+Quality Control For Each Order: Receiving verification of materials/consumables by Operations PIC in accordance with contract specifications or requirements specified in the ITP. Reference: ITP/External Providers D.O. 
+Category C: Capital Purchase 
+
+Purchasing Method: Credit Terms / Signed Confirmation on vendors/External Provider quotation. 
+Pre-Qualification (For New External Provider): ISO certified company preferred or based on Showroom - Product Demo, Catalogue - Technical Evaluation. 
+Responsibility for Pre-Qualification: Initiated & approved by CEO/Operations PIC. 
+On-Going Appraisal (Existing External Provider): N.A. 
+Responsibility for On-Going Appraisal: N.A. 
+Quality Control For Each Order: Commissioning of machinery by CEO or delegate to ensure conformance to contract specifications. 
+Category D: Subcontract Works (Outsourced) (Translators, Interpreters, Voice-Overs, Translation Agencies, Copywriters) 
+
+Purchasing Method: P.O. 
+Pre-Qualification (For New External Provider): Passed Sample test reviewed internally/by senior translators, ISO certified company preferred or based on Recommendation, Market Reputation, Portfolio of past experiences & clients. 
+Responsibility for Pre-Qualification: Initiated by Purchaser, Approved by CEO/Operations PIC. 
+On-Going Appraisal (Existing External Provider): Yearly Assessment. 
+Responsibility for On-Going Appraisal: Purchaser/Operations PIC. 
+Quality Control For Each Order: Ongoing deliverables check by Purchaser/Operations PIC in accordance with contract specifications or requirements specified in the Operations Control Plan. Inspection records shall be maintained. 
+Category E: Services (Outsourced) (Maintenance of Office Equipment) 
+
+Purchasing Method: Credit Terms / Signed Confirmation on vendors/External Provider quotation/contract. 
+Pre-Qualification (For New External Provider): ISO certified company preferred or based on Track Record, Recommendation. 
+Responsibility for Pre-Qualification: Initiated by Purchaser, Approved by CEO/Operations PIC. 
+On-Going Appraisal (Existing External Provider): Yearly Assessment. 
+Responsibility for On-Going Appraisal: Purchaser/Operations PIC. 
+Quality Control For Each Order: Verification of services rendered/Servicing Report/D.O. by Purchaser/Operations PIC upon handover by service contractor.

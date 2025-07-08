@@ -1,0 +1,189 @@
+VERZTEC CONSULTING PTE LTD QUALITY MANUAL 
+
+Document No.: QM 
+Revision: D 
+Effective Date: 1st Dec 2016 
+Last Revised: 2nd Sept 2024 
+Revisions to the Manual:
+
+Revision A: Initial Release - ISO 9001:2008 Requirements 
+Revision B: Included ISO 9001:2015 requirements 
+Revision C: Revised Annex IV (Business Risk Assessment) to include effectiveness of actions, updated requirements for interested parties, and added a management programme table.
+Revision D: Included external issue - Climate change (global warming) affecting business direction to go green.
+Management Foreword / Commitment 
+
+The Quality Manual and its procedures are based on ISO 9001:2015.
+The company aims to consistently provide products and services that meet customer, statutory, and regulatory requirements.
+It also aims to enhance customer satisfaction through effective system application, continual improvement, and assurance of conformity to requirements[cite: 9].
+Top Management Commitment to QMS Development and Improvement 
+
+Ensuring customer, statutory, and regulatory requirements are identified and met to enhance customer satisfaction.
+Communicating the importance of meeting these requirements throughout the organization.
+Establishing the quality policy and quality objectives.
+Ensuring planning and integrity of the Quality Management System (QMS).
+Defining and communicating responsibilities and authorities.
+Appointing management representative(s).
+Conducting management reviews.
+Integrating QMS requirements into business processes.
+Promoting the use of the process approach and risk-based thinking.
+Ensuring resources for the QMS are available.
+Communicating the importance of effective quality management and conformity to QMS requirements.
+Ensuring the QMS achieves its intended results.
+Engaging, directing, and supporting personnel to contribute to QMS effectiveness.
+Promoting continual improvement.
+Supporting other management roles to demonstrate leadership.
+Taking accountability for QMS effectiveness.
+Ensuring the quality policy and objectives are compatible with the organization's context.
+Customer Focus 
+
+Top management ensures customer and applicable statutory/regulatory requirements are determined, understood, and consistently met.
+Risks and opportunities affecting product/service conformity and customer satisfaction are determined and addressed.
+Focus on enhancing customer satisfaction is maintained.
+Appointment of Management Representative (MR) 
+
+The CEO appoints an overall-in-charge, designated as the Management Representative (MR), to ensure QMS requirements are established, implemented, and maintained.
+Ms. Jenny Woon (COO) is appointed as the MR.
+A Deputy Management Representative (DMR) may be appointed to assist the MR.
+The MR ensures QMS processes are established, implemented, and maintained, reports on QMS performance, promotes awareness of customer requirements, and liaises with external parties.
+Quality Policy 
+
+Verztec Consulting Pte Ltd is committed to enhanced customer satisfaction by meeting requirements and continually improving the QMS through on-time delivery and quality service.
+The policy provides a framework for quality objectives, is communicated and applied, reviewed for suitability, available as documented information, and accessible to interested parties.
+Quality Objectives 
+
+100% on-time delivery by the latest agreed date.
+Client overall satisfaction feedback quality of at least 7/10.
+At least one client testimonial per quarter.
+These objectives are consistent with the Quality Policy, measurable, monitored, updated, and communicated.
+Company Profile 
+
+Customer-focused organization dedicated to delivering globalization solutions.
+Conducts customer satisfaction surveys and uses feedback for continuous improvement.
+Scope of Business 
+
+Includes Localization and Translation, Interpretation, Internationalization, Software Localization & Testing, Website Localization, e-Learning and Training applications, Audio Recording, Multilingual Desktop Publishing, Transcription, Globalization Consulting and Web Engineering, Design and development of annual reports, marketing collateral, websites, e-Learning.
+Considerations for scope: external/internal issues, requirements of interested parties, and products/services.
+Applicable Standards 
+
+SS ISO 9000:2015 Quality Management Systems - Fundamentals and Vocabulary.
+SS ISO 9001:2015 Quality Management Systems - Requirements.
+Products / Work 
+
+Products: Publishing, Hosting.
+Work: Multilingual desktop publishing, translation, audio recording (voice over), interpretation project management, localization, internalization, e-Learning and development, design and development of annual reports, marketing collateral, websites.
+Typical Business Process 
+
+Sales enquiry and handling, preparing quotations, kicking off translation jobs, delivering files to clients (CD/email/FTP), and re-engineering files if needed.
+Customer Types 
+
+MNCs, SMEs, Government, Associations.
+Permissible Exclusions (ISO 9001:2015 elements not applicable) 
+
+Design & Development (ISO Clause 7.3): Not applicable as service does not include design for clients.
+Validation of Processes (8.3.4 Design and development controls): Not applicable as no special process whose output cannot be verified by subsequent monitoring or measurement.
+Control of Monitoring & Measuring Devices (7.1.5 Monitoring and Measuring Resources): Not applicable as no monitoring or measuring devices are used in operations.
+Quality Management System Organization Chart 
+
+Includes CEO, Management Representative/Deputy Management Representative, Document Controller, and Internal Audit Team.
+Management Responsibility & Authority 
+
+The organization has established QMS processes and 'Quality Responsibilities' detailed in Annex II.
+Persons-in-charge (PICs) are responsible for management functions, detailed under the 'AUTHORITY' column.
+Quality responsibilities of PICs are detailed under the 'QUALITY RESPONSIBILITY' column.
+Applicable Quality Procedures are given under 'QP REF.' to address process interaction.
+PICs ensure coverage of 'QUALITY RESPONSIBILITY' by conforming to Quality Procedures.
+PICs drive management performance by meeting standards from quality plans, company objectives, and ISO requirements.
+Top management conducts management reviews for continual improvement of QMS effectiveness and efficiency through data analysis.
+Responsibilities and authorities are assigned, communicated, and understood.
+Top management assigns responsibility for QMS conformity, process output delivery, performance reporting, customer focus promotion, and QMS integrity during changes.
+The CEO is accountable for QMS effectiveness.
+Management Prevention 
+
+Management assesses product/service risks based on data/records before implementation to control work processes and prevent risk occurrence.
+Management Control - by Monitoring & Measurement 
+
+Customer Satisfaction: By Customer Satisfaction Monitoring Plan.
+System (effectiveness): By Internal Audit Programme.
+Process: By Operations Control Plan.
+Supplier: By Supplier Control Plan.
+Product: By Inspection & Test Plan.
+For nonconformities, root-cause analysis is conducted for effective corrective action and risk non-recurrence.
+QM Principles (ISO 9001:2015 Guidelines) 
+
+Customer focus: Understanding and exceeding customer needs.
+Leadership: Establishing unity of purpose and direction, creating an environment for employee involvement.
+Engagement of people: Full involvement of people for organizational benefit.
+Process approach: Managing activities and resources as a process for efficient results.
+Improvement: Continual improvement as a permanent objective.
+Evidence-based decision making: Decisions based on data and information analysis.
+Relationship management: Mutually beneficial relationships with external providers.
+QMS Documentation 
+
+Hierarchy of QMS documentation in Annex III.
+Documented control procedures ensure QMS documents and records are protected, stored, preserved, retained, disposed of, located, legible, reviewed, revised, approved, available, suitable for use, and promptly removed when obsolete.
+External documented information is identified and controlled.
+When creating/updating, ensures appropriate identification, description, format, media, review, and approval.
+Context of the Organization 
+
+Understanding the organization and its context: Monitors and reviews internal and external issues yearly that impact product/services and QMS outcomes.
+
+Internal Issues:
+Technical Capability: Beneficial (consistently deliver scope).
+Materials & Equipment: Beneficial (existing inventory supports services).
+Employees: Beneficial (low turnover).
+Employees: Adverse (new employees need guidance).
+External Issues:
+Competitiveness: Adverse (highly competitive industry with cheap services).
+Social & Cultural Diversity: Beneficial (operating in multi-cultural country without significant issues).
+Political stability: Beneficial (operating in stable country with fair business requirements).
+Employees: Beneficial (adequate skilled workforce).
+Legal Requirements: Beneficial (identified and in compliance).
+Climate changes: Beneficial (affecting businesses direction to go green, more digital courses).
+Understanding the needs and expectations of interested parties: Identifies interested parties and their requirements.
+
+Customers (External): Direct recipient of products/services; require on-time delivery and quality/quantity of work.
+Employees (Internal): Responsible for product/service realization; require training, competent staff, prompt salary, career progression, enhanced competency, clear instructions, and SOPs.
+Vendors/External Providers (External): Provide supporting services/materials/equipment; require prompt payment, clear requirements/specifications, and encouraged to offer green products.
+Regulators (External): Dictate controlling regulations; require compliance to applicable legal requirements (e.g., WSH Act, Data protection).
+Certification Bodies (External): Assess QMS conformity to ISO Standards; require conformity to ISO 9001:2015.
+Competitors (External): Provide challenges; require competitiveness and meeting customer requirements.
+Actions to address Risks and Opportunities: Establishes processes for identifying compliance obligations and planning actions to address risks and opportunities. Considers internal/external issues, interested parties' needs, and QMS scope. Aims to achieve intended outcomes, prevent/reduce undesired effects, and achieve continual improvement. Documented information on compliance obligations, risks, and opportunities is maintained. Refer to Annex IV for business risk assessment.
+
+
+
+
+
+Planning Action: Plans actions to address compliance obligations, identified risks, and opportunities, considering technological options and financial/operational/business requirements. Integrates actions into QMS processes and evaluates their effectiveness. Actions are proportionate to potential impact on product/service conformity. Relevant processes integrated include quality objectives, resources, competence, awareness, communications, documented information, operational planning and control, monitoring, measurement, analysis, and evaluation. Determines and provides resources needed for QMS establishment, implementation, maintenance, and continual improvement. Considers internal resources and external providers.
+
+
+
+
+
+Internal and External Communication 
+
+Management recognizes the importance of good internal and external communication for QMS effectiveness.
+Established top-down and bottom-up channels for interaction and information exchange.
+Procedures document interfaces between tasks and colleagues.
+Communication processes consider compliance obligations, ensure consistency and reliability of information.
+QMS communication is responded to and documented.
+Receiving, documenting, and responding to external communications.
+Determining what, when, how, and with whom communication will be done.
+MR/Individual function heads/Project Managers ensure reliable information before communication.
+Communication Process Summary:
+Significant QMS matters: Newly identified and revised; communicated to employees and vendors via orientation, departmental meetings, emailing.
+Quality Related Operational Control Procedures: Newly established and revised; communicated to employees and vendors via orientation, departmental meetings, emailing.
+License/Permit Related Information: As required; communicated to relevant regulatory bodies via emailing, letter.
+QMS Policy: As revised; communicated to employees and vendors via orientation, departmental meetings, emailing.
+Applicable Legal Obligations: Newly identified and revised; communicated to employees via emailing.
+QMS Objectives: Newly established and revised; communicated to employees via orientation, departmental meetings, emailing.
+Results of QMS Monitoring: As required; communicated to employees via departmental meetings, emailing.
+Contractual requirement from customer: As required; communicated to customers via emailing, contract agreement, meeting.
+Organization requirements which vendors/external providers need to follow: Newly identified and as required; communicated to vendors/external providers via emailing, contract agreement, meeting.
+Organization requirements which employees need to follow to ensure QMS conformance: As required; communicated to employees via training briefing.
+Requirements from the ISO Standards that the Organization will conform to: As required; communicated to Certification Bodies via emailing, meeting.
+Requirements to be competitive and meet customer requirements: As required; communicated to individual function heads via emailing, meeting.
+Management Review 
+
+Top Management reviews the QMS at planned intervals for suitability, adequacy, and effectiveness.
+Annual review evaluates changes needed to QMS, including quality policy and objectives.
+Review Input: Includes status of actions from previous reviews, changes in external/internal issues, resource adequacy, effectiveness of actions for risks/opportunities, opportunities for improvement, QMS performance/effectiveness (trends in external provider performance, nonconformities, corrective actions, monitoring/measurement results, achievement of quality objectives, audit results).

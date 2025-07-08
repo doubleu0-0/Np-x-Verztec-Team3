@@ -1,0 +1,73 @@
+Title: Control of Records (Documented Information) 
+
+Purpose: The organization shall establish a documented procedure to define the controls needed for the identification, storage, protection, retrieval, retention time and disposition of records. Records shall remain legible, readily identifiable, and retrievable. 
+Scope: This procedure applies to the quality records of all Functions which are referred to as documented information. 
+Responsibility:
+The individual Functional Head is responsible to provide instruction for the completion and storage of quality records which must be kept for historical purposes. He is to ensure that every alteration made on the quality record is to be counter-signed by the Originator or by his / her immediate Superior.
+
+The individual Function is responsible for the identification, storage, protection, retrieval, retention and disposition of quality records.
+Records shall be established and maintained to provide evidence of conformity to requirements and of the effective operation of the quality management system shall be controlled.
+Procedure:
+4.1 Planning: The Management Representative shall plan for a Masterlist of Quality Records to be maintained as evidence of the Quality Management System implementation through Table 1 - List of Quality Records. 
+4.2 Execution:
+4.2.1 Identification & Indexing of Quality Records: The Quality Records in use shall be identified by a "Form Number" and / or Document Title. For indexing of Quality Records (Forms) - refer to QP-SMQ-04.
+
+4.2.2 Storage, Protection, Retrieval, Retention and Disposition of Quality Records:
+The collection or transportation of data or information amongst inter-Department / Function may operate through the routine transaction of Quality Record (by manual) as per quality procedures.
+Each Department / Functional Head or their delegate shall maintain their own filing of Quality Records.
+Records are accessible to those who will need to retrieve them. End user shall seek permission from relevant Department / Functional Head of which the records belong.
+
+Records including those submitted by pertinent subcontractor shall be made available for review at the request of the customer or other responsible party.
+Records shall be segregated, identified, logged and boxed as of the last working day of the fiscal year, or when their quantity warrants.
+Records shall be stored and maintained in facilities which allow easy retrieval and that provide suitable environment to minimize deterioration or damage and to prevent loss.
+Records shall be stored for the minimum period stipulated in Table 1 (with the exception of Training Records which will only be disposed upon termination of service of employee), unless otherwise contractually required.
+Records shall be disposed by the Administrative personnel through appropriate method (i.e. shredding or other suitable means) with the approval of Management Representative upon expiry of the archived records. Alternatively, an annual review may be performed by the Administrative personnel together with Functional Heads to dispose expired records and update the respective storage logs.
+
+4.3 Monitoring (Checking) / Effective Actions:
+The Management Representative / Administrative personnel shall perform self-check to determine extent of compliance to this procedure and undertake necessary / appropriate management actions timely for full compliance.
+The internal auditors shall audit the implementation of this procedure to ensure full conformity.
+The Management Representative / Administrative personnel shall, after close-out of all nonconformities from internal / external audits, propose improvement(s) in the Management Review meeting for top managements approval.
+5. Reference Quality Records / Forms: Nil.
+Table 1 - List of Quality Records:
+
+QP-SAL-01
+SAL-QR-01: Quotation (2 years, Sales) 
+SAL-QR-02: Web Order (2 years, Sales) 
+SAL-QR-03: Meeting Report (2 years, Sales) 
+QP-OPS-01
+OPS-QR-01: Project Schedule (2 years, Operations) 
+OPS-QR-02: Task Request Form (2 years, Operations) 
+QP-MMP-01
+MMP-QR-01: Quality Assurance (QA) Check Sheet (2 years, Operations) 
+MMP-QR-02: Nonconformance Report (2 years, Operations) 
+QP-CS-01
+CS-QR-01: Customer Satisfaction Survey (2 years, Sales) 
+CS-QR-02: Customer Satisfaction Monitoring Plan (2 years, Sales) 
+QP-HRD-01
+HRD-QR-01: Training Programme (2 years, Human Resource) 
+HRD-QR-02: Training Record (Employment Period, Human Resource) 
+HRD-QR-03: Training Feedback & Evaluation Form (2 years, Human Resource) 
+HRD-QR-04: Training Budget (2 years, Human Resource) 
+QP-PSC-01
+PSC-QR-01: Approved Supplier List (ASL) (2 years, Purchasing) 
+PSC-QR-02: Purchase Order (2 years, Purchasing) 
+PSC-QR-03: Supplier Performance Assessment Form (2 years, Purchasing) 
+PSC-QR-04: Web Resource Pool (2 years, Purchasing) 
+PSC-QR-05: Web Resource Pool Performance Assessment Form (2 years, Purchasing) 
+QP-MTN-01
+MTN-QR-01: Equipment Maintenance Programme (2 years, Operations) 
+QP-SMQ-01
+IA-QR-01: Internal Audit Programme (3 years, Audit Team) 
+IA-QR-02: Audit Plan (3 years, Audit Team) 
+IA-QR-03: Audit Checklist (3 years, Audit Team) 
+QP-SMQ-02
+CPA-QR-01: Customer Complaint Report (3 years, All) 
+CPA-QR-02: Corrective Action Request (3 years, All) 
+QP-SMQ-03
+MR-QR-01: Continual Improvement Plan (3 years, MR) 
+-: Minutes of Management Review Meeting (3 years, MR) 
+QP-SMQ-04
+QTL-QR-01: Controlled Quality Document Distribution Log (3 years, MR / DC) 
+QTL-QR-02: Uncontrolled Quality Document Distribution Log (3 years, MR / DC) 
+QTL-QR-03: Document Revision Record (3 years, MR / DC) 
+QTL-QR-04: Change Request Form (3 years, MR / DC) 

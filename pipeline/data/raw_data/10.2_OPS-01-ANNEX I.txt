@@ -1,0 +1,74 @@
+ANNEX I - OPERATIONS CONTROL PLAN
+
+1. TRANSLATING
+
+Process Activity: Sales Interface
+
+QP Reference: QP-SAL-01
+Reference Standard: As per customer's requirement
+Process Parameter: Specification, Delivery
+In-company Control Limits: Accuracy & completeness of data
+Records Kept: Web Order
+Department & Person Responsible: CEO, COO, Manager, Consultant
+Process Activity: Operations Planning
+
+A1: Translator Selection
+Process Parameter: Customer required detail specification, Delivery / date / time
+In-company Control Limits: Respond quickly, Accuracy & completeness of data
+Records Kept: MS Project Plan (for complex project)
+Department & Person Responsible: CEO, COO, Manager, Consultant
+Scheduling
+B1: Deployment, B2: Service Handover, B3: Counselling
+Reference Standard: As per customer's requirement
+Process Parameter: Correct schedule, Respond time
+In-company Control Limits: Accuracy of translator data, Customers agreed schedule
+Records Kept: Project Schedule, Web Order
+Department & Person Responsible: CEO, COO, Manager, Consultant
+Process Activity: Job Processing
+
+C1: Job Interview
+Process Parameter: Job details
+In-company Control Limits: To ensure clarity of details & completeness
+Records Kept: Weekly Report (Client name, contact #, scope, status, last update)
+Department & Person Responsible: CEO, COO, Manager, Consultant
+Process Activity: Monitoring & Control
+
+D1: Periodic Customer Feedback, D2: Evaluation, D3: Feedback to Sales
+Process Parameter: Customer satisfaction
+In-company Control Limits: Achieve customer satisfaction based on ISO standard (customer satisfaction survey score > 7/10)
+Records Kept: Customer Satisfaction Feedback
+Department & Person Responsible: CEO, COO, Manager, Consultant
+2. DESKTOP PUBLISHING
+
+Process Activity: Receive Project file from Consultant
+
+Process Parameter: Specification
+In-company Control Limits: Accuracy & completeness of data
+Records Kept: Project file (softcopy) such as source file
+Department & Person Responsible: IT Department
+Process Activity: Research
+
+Process Parameter: Customer required detail specifications
+In-company Control Limits: Accuracy & completeness of data
+Records Kept: Project file
+Department & Person Responsible: IT Department
+Process Activity: Edit entire brochure
+
+Process Parameter: Job details
+In-company Control Limits: Ensure clarity of details & completeness
+Records Kept: Project file
+Department & Person Responsible: IT Department
+Process Activity: Hand to Project Consultant
+
+Process Parameter: On-time, Customer specification
+In-company Control Limits: Customers agreed schedule, Accuracy & completeness of data
+Records Kept: Working file
+Department & Person Responsible: CEO, Manager, Consultant
+3. HOSTING
+
+Process Activity: Service Delivery
+QP Reference: QP-OPS-01
+Process Parameter: On-time, Customer specifications
+In-company Control Limits: Accuracy & completeness of data
+Records Kept: Work Order, Service Order
+Department & Person Responsible: CEO, COO, Manager, Consultant

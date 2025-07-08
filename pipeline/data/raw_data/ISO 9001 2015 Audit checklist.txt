@@ -1,0 +1,281 @@
+ORGANISATION NAME: ……………………………………………………………………………………………………………………………………………………………………………………………………………………………. 
+AUDIT CONDUCTED BY: …………………………………………………………………………… 
+DEPARTMENT: ……………………………………………………………………………… 
+DATE: ………………........... 
+
+4 CONTEXT OF THE ORGANISATION 
+
+4.1 Understanding the organisation and its context 
+
+Has your organisation determined the external and internal issues that are relevant to your purpose and strategic direction? 
+Have you considered the relevant issues that affect your ability to achieve the intended results of the Quality Management System (QMS)? 
+How do you monitor and review the information related to the external and internal issues? 
+Additional Questions 
+4.2 Understanding the needs and expectations of interested parties 
+
+Have you identified the interested parties and their requirements that are relevant to the QMS? 
+How do you monitor and review the information about the interested parties and their relevant requirements? 
+Additional Questions 
+4.3 Determining the scope of the QMS 
+
+When determining the scope of the QMS, have you considered the: External and internal issues (per 4.1); Requirements of relevant interested parties (per 4.2); and, The products and services of your organisation? 
+When a requirement of ISO 9001 can be applied, has your organisation applied the requirement? 
+When a requirement cannot be applied and in order to claim conformity to ISO 9001:2015, how do you determine if your ability or responsibility to ensure conformity of products and services are not affected? 
+Is the scope of the QMS available and maintained as documented information? 
+In the scope of the QMS, have you stated the products and services covered by the QMS? 
+Has your organisation provided justification for any instance where a requirement of the standard cannot be applied? 
+Additional Questions 
+4.4 QMS and its processes 
+
+4.4.1 Establish a QMS that complies with this standard 
+Has your organisation obtained the current version of the ISO 9001:2015? 
+As required by the standard, have you established, documented, implemented, maintained and continually improved the QMS? 
+When developing a process-based QMS, have you determined the following: The processes that your QMS needs; The methods needed to manage the processes; The resources needed to support the processes; The process responsibilities and authorities; The risks and opportunities for each process and the methods to evaluate processes? 
+4.4.2 Maintain QMS documents and retain QMS records 
+How have you maintained documents needed to support process operations? 
+Have you retained records that show that the plans have been followed? 
+Additional Questions 
+5 LEADERSHIP 
+
+5.1 Provide leadership by focusing on quality and customers 
+
+5.1.1 Provide leadership by encouraging a focus on quality 
+Have the top management demonstrated leadership by accepting responsibility for your QMS, demonstrating a commitment to your QMS and communicating your commitment to the QMS? 
+5.1.2 Provide leadership by encouraging a focus on customers 
+How has top management demonstrated leadership and commitment with respect to customer focus? 
+Additional Questions 
+5.2 Provide leadership by establishing a suitable quality policy 
+
+5.2.1 Provide leadership by formulating your quality policy 
+Have top management developed an appropriate quality policy that supports your organisation’s purpose and context? 
+How have top management implemented and maintained your organisation's quality policy? 
+5.2.2 Provide leadership by implementing your quality policy 
+How have top management applied and communicated your organisation's quality policy? 
+Additional Questions 
+5.3 Provide leadership by defining roles and responsibilities 
+
+Have QMS roles, responsibilities and authorities been assigned and communicated? 
+6 PLANNING 
+
+6.1 Define actions to manage risks and address opportunities 
+
+6.1.1 Consider risks and opportunities when you plan your QMS 
+When identifying the risks and opportunities that could influence the performance of your organisation's QMS or disrupt its operation, have you considered how your organisation's context and interested parties could affect how well its QMS is able to achieve intended results? 
+Have you figured out how to address the risks and opportunities that could influence the performance of your organisation's QMS or disrupt its operation? 
+6.1.2 Plan how you're going to manage risks and opportunities 
+Are your actions to address risks and opportunities, which could influence the performance of your QMS or disrupt or damage its operation, defined? 
+Have you considered your organisation’s risk treatment options? 
+Additional Questions 
+6.2 Set quality objectives and develop plans to achieve them 
+
+6.2.1 Establish quality objectives for all relevant areas 
+Are your organisation’s criteria for setting quality objectives clear? 
+How have your organisation's quality objectives been communicated, documented and monitored? 
+Are your organisation's quality objectives being updated? 
+6.2.2 Develop plans to achieve objectives and evaluate results 
+Has your organisation established a plan to achieve quality objectives? 
+How will your organisation evaluate your results? 
+Additional Questions 
+6.3 Plan changes to your QMS 
+
+When planning for changes to your organisation's QMS, have you considered: The purpose of the changes you intend to make; The responsibilities and authorities; The consequences that changes could potentially produce; The availability of resources and the integrity of the QMS? 
+Additional Questions 
+7 SUPPORT 
+
+7.1 Support your QMS by providing the necessary resources 
+
+7.1.1 Provide internal and external resources for your QMS 
+Have you determined and provided the resources that your QMS needs? 
+7.1.2 Provide suitable people for your QMS and your processes 
+Has your organisation provided the people that your QMS needs to be effective? 
+7.1.3 Provide the infrastructure that your processes must have 
+Has your organisation determined and decided on the infrastructure that your processes need? 
+7.1.4 Provide the appropriate environment for your processes 
+Has your organisation determined and decided on the environment that your processes need? 
+7.1.5 Provide monitoring, measuring and traceability resources 
+7.1.5.1 Provide suitable monitoring and measuring resources 
+Has your organisation determined and provided monitoring and measuring resource requirements? 
+7.1.5.2 Provide suitable measurement traceability resources 
+Has your organisation determined your measurement traceability requirements and provided suitable measurement traceability resources? 
+7.1.6 Provide knowledge to facilitate process operations 
+Have you determined and acquired the knowledge that your organisation needs to have? 
+How have you made organisational knowledge available to the extent necessary? 
+Have you monitored relevant trends and changes in knowledge and information? 
+How have you maintained the organisational knowledge that has been acquired? 
+Additional Questions 
+7.2 Support your QMS by ensuring that people are competent 
+
+Have you identified those under your control who do work that affect quality? 
+Have you clarified your organisation's quality competence requirements? 
+How have you acquired competence whenever shortcomings are discovered? 
+Have you documented the competence of those whose work affects quality? 
+Have you evaluated the effectiveness of actions taken to acquire competence? 
+Additional Questions 
+7.3 Support your QMS by explaining how people can help 
+
+How have you made personnel aware of your organisation's QMS? 
+Additional Questions 
+7.4 Support your QMS by managing your communications 
+
+Have you figured out how the internal and external communications will be handled? 
+Additional Questions 
+7.5 Support your QMS by controlling documented information 
+
+7.5.1 Include the documented information that your QMS needs 
+Have you figured out how extensive the documented information should be? 
+Have you considered your activities, personnel, processes, products, services and size when you establish documents and records? 
+Have you selected all the internal and external documents and records that your QMS needs? 
+7.5.2 Manage the creation and revision of documented information 
+Are your organisation's QMS documents properly identified, described, formatted, presented, reviewed and approved? 
+7.5.3 Control the management and use of documented information 
+7.5.3.1 Control your organisation's QMS documents and records 
+Have you selected and controlled the QMS documents and records that your QMS needs? 
+7.5.3.2 Control how QMS documents and records are controlled 
+How do you control how QMS documents and records are created, identified, distributed, accessed, retrieved, stored, used, changed, protected and preserved? 
+Additional Questions 
+8 OPERATIONS 
+
+8.1 Develop, implement and control your operational processes 
+
+Have you prepared operational process implementation and control plans? 
+How have you used those plans to implement and control operational processes? 
+Have you retained suitable operational process documents and records? 
+Additional Questions 
+8.2 Determine and document product and service requirements 
+
+8.2.1 Communicate with customers and manage customer property 
+Have you communicated with customers by providing information to them as well as by obtaining information from them? 
+How do you control property supplied by customers? 
+8.2.2 Clarify all product and service requirements and capabilities 
+Have you determined the requirements for products and services offered to customers and verified that you are capable of meeting these requirements? 
+8.2.3 Review product and service requirements and record results 
+8.2.3.1 Verify requirements before you accept orders from customers 
+Does your organisation review product and service requirements before they accept orders and can they confirm that they can meet these product and service requirements? 
+Does your organisation clarify differences between original proposals and the final orders? 
+8.2.3.1 Document your review of product and service requirements 
+Have you documented the results of product and service requirement reviews? 
+Have you documented any new or changed product and service requirements? 
+8.2.4 Amend documents when product and service requirements change 
+Have you amended all relevant documented information to reflect changes in customers' product and service requirements? 
+Have you retained and controlled documents and records that describe new or modified product and service requirements? 
+Additional Questions 
+8.3 Establish a process to design and develop products and services 
+
+8.3.1 Create an appropriate design and development process 
+Have you established and implemented an appropriate design and development process? 
+8.3.2 Plan product and service design and development activities 
+When you plan your design and development stages and controls, have you considered the: Design and development process; Complexities; Requirements; Expectations; Participation; Interfaces; Responsibilities; Documentation; and Resources? 
+8.3.3 Determine product and service design and development inputs 
+Have you clarified your product and service design and development inputs? 
+Have you designed the product and service design and development resource needs? 
+How do you control your design and development input documents and records? 
+8.3.4 Specify how design and development process will be controlled 
+When controlling product and service design and development activities, do you control how design and development: Results are defined; Reviews are carried out; Validations are performed; and, Verifications are done? 
+Have you documented product and service design and development activities? 
+8.3.5 Clarify how design and development outputs will be produced 
+When controlling product and service design and development outputs, have you ensured that outputs: Can be compared against input requirements; Are capable of supporting product provision; Include or refer to acceptance criteria; and, Can be used to validate proposals? 
+How do you control design and development output documents and records? 
+8.3.6 Review and control all design and development changes 
+Have you identified, reviewed and controlled changes made during or subsequent to design and development? 
+Additional Questions 
+8.4 Monitor and control external processes, products and services 
+
+8.4.1 Confirm that external products and services meet requirements 
+Have you established controls for external processes, products and services? 
+Have you determined criteria to select, evaluate and monitor external providers? 
+8.4.2 Develop controls for externally provided products and services 
+Have you considered the potential impact that externally provided processes, products and services could have on your organisations ability to consistently meet external requirements? 
+Have you considered the controls that external process, product and service providers have implemented and how effective their controls actually are? 
+Have you developed and implemented controls for external providers, processes, products and services? 
+8.4.3 Discuss your organisation's requirements with external providers 
+When clarifying your expectations from external providers, have you clarified your organisation's: Process requirements; Product requirements; Service requirements; Equipment requirements; Interaction requirements; Competence requirements; Methodological requirements; Monitoring and control requirements; and, Verification or validation requirements? 
+Have you discussed your organisation's requirements with external providers? 
+Additional Questions 
+8.5 Manage and control production and service provision activities 
+
+8.5.1 Establish controls for production and service provision 
+Have you implemented controlled conditions for production, service provision, delivery process and post delivery process? 
+8.5.2 Identify your outputs and control their unique identity 
+Have you used suitable means to identify outputs throughout production and service provision? 
+How do you control the unique identity of your outputs if traceability is required? 
+8.5.3 Protect property owned by customers and external providers 
+Have you identified, verified, protected, monitored and documented property belonging to customers and external providers? 
+8.5.4 Preserve outputs during production and service provision 
+When preserving outputs during production and service provision, have you considered using suitable: Identification methods to preserve outputs; Packaging methods to preserve outputs; Handling methods to preserve outputs; Storage methods to preserve outputs; Transmission methods to preserve outputs; and, Transportation methods to preserve outputs? 
+8.5.5 Clarify and comply with all post-delivery requirements 
+Have you clarified your organisation's post-delivery requirements by identifying the activities that must be carried out after product delivery and after service delivery? 
+Have you complied with your organisation's post-delivery requirements? 
+8.5.6 Control changes for production and service provision 
+Have you reviewed changes in production and service provision? Have the review results, actions taken and authorisations been documented? 
+How do you control the changes in production and service provision? 
+Additional Questions 
+8.6 Implement arrangements to control product and service release 
+
+Have you established planned arrangements to verify products and services at each stage and to confirm if product and service requirements were met at appropriate stages? 
+Additional Questions 
+8.7 Control nonconforming outputs and document actions taken 
+
+8.7.1 Identify and control nonconforming output to prevent unintended use 
+Have you identified outputs that do not conform to their requirements? 
+Have you evaluated nonconforming outputs and examined their impact? 
+Have you taken appropriate action to control nonconforming outputs? 
+Have you verified conformity when nonconforming outputs are corrected? 
+8.7.2 Document nonconforming outputs and the actions that are taken 
+Have you documented your organisation's nonconforming outputs? 
+Have you documented the actions and decisions taken to prevent the unintended use or delivery of nonconforming outputs? 
+9 EVALUATION 
+
+9.1 Monitor, measure, analyse and evaluate QMS performance 
+
+9.1.1 Plan how to monitor, measure, analyse and evaluate 
+Do you have a plan on how to monitor, measure, analyse and evaluate your company's QMS? 
+How do you monitor, measure, analyse and evaluate your company's QMS performance and effectiveness? 
+9.1.2 Find out how well customer needs and expectations are being met 
+Does your company have methods that you can use to monitor customer perceptions? 
+Are you monitoring how well customer needs and expectations are being fulfilled? 
+9.1.3 Evaluate performance, effectiveness, conformity and satisfaction 
+Have you analysed your monitoring and measurement results? 
+Have you used your analytical results to evaluate performance, effectiveness, conformity and satisfaction? 
+Additional Question 
+9.2 Use internal audits to examine conformance and performance 
+
+9.2.1 Audit your QMS at planned intervals 
+Does your company conduct internal conformance audits at planned intervals to determine if their QMS meets requirements? 
+Does your company examine the effectiveness of their QMS? 
+9.2.2 Develop an internal audit program for your company 
+Has your company planned the development of an internal audit program that can find out if their QMS meets requirements and is effective? 
+Has your company established internal audit planning requirements, reporting requirements, responsibilities, schedules and methods? 
+Additional Questions 
+9.3 Carry out management reviews and document your results 
+
+9.3.1 Review suitability, adequacy, effectiveness and direction 
+Do you review your company's QMS at regular intervals to assess the suitability, adequacy, effectiveness and direction? 
+9.3.2 Plan and perform management reviews at planned intervals 
+Have you planned your company's management review activities? 
+Have you scheduled your company's reviews at planned intervals? 
+Have you reviewed your company's QMS? 
+9.3.3 Generate management review outputs and document results 
+Have you generated and documented the results for your management reviews? 
+Additional Questions 
+10 IMPROVEMENT 
+
+10.1 Determine improvement opportunities and make improvements 
+
+When considering ways of enhancing customer satisfaction, have you considered opportunities to: Support innovation; Take corrective action; Transform your operations; and, Make incremental changes? 
+Has your company identified opportunities to meet customer requirements and enhance customer satisfaction? 
+How has your company met customer requirements and enhanced satisfaction? 
+Additional Questions 
+10.2 Control nonconformities and take appropriate corrective action 
+
+10.2.1 Correct nonconformities and address causes and consequences 
+How does your company correct their nonconformities? 
+Does your company evaluate the need to eliminate causes and develop and implement corrective actions to address causes? 
+How often does your company review the effectiveness of their corrective actions? 
+10.2.2 Document your nonconformities and the actions that are taken 
+Are your company's nonconformities, actions taken to address nonconformities and corrective action results documented? 
+Additional Questions 
+10.3 Enhance the suitability, adequacy and effectiveness of your QMS 
+
+Have your unmet QMS needs been addressed? 
+Has your company improved the suitability, adequacy and effectiveness of their QMS? 
+Additional Questions

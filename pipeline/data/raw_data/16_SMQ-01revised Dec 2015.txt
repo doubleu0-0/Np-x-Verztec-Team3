@@ -1,0 +1,75 @@
+TITLE: INTERNAL AUDIT
+
+1. Purpose: To define a system for conducting Internal Audit to evaluate the effectiveness of the implementation of the Quality System.
+2. Scope: This procedure applies to all functions.
+3. Definitions:
+3.1 An Audit Team Member is a person who has the qualification and is authorized to perform a Quality System audit.
+3.2 An Audit Team Leader is a person who has the qualification and is authorized to manage a team of Auditors.
+3.3 An Auditee is the person/function being audited.
+4. Responsibility:
+4.1 The Management Representative shall complete the yearly Internal Audit Programme (see Form No. IA-QR-01). The entire system shall be audited once a year. He shall oversee the internal audit activities and oversee the close-out of all outstanding corrective actions.
+4.2 A designated Functional Head will act as the Audit Team Leader.
+4.3 The Audit Team Leader shall complete an Audit Plan to plan, execute, and follow-up on the entire Auditing cycle.
+4.4 The Auditor has to carry out the instruction given by the Audit Team Leader.
+4.5 The Auditee's Functional Head shall verify and correct nonconformities discovered by the Audit Team. He shall ensure the effectiveness of the corrective actions.
+4.6 The Management Representative shall report to top management on the effectiveness of the Quality Management System and areas of improvement.
+5. Procedure:
+5.1 Planning the Internal Audit Programme:
+5.1.1 The Management Representative/Audit Team Leader shall review and assess previous and current: (i) corrective actions, (ii) improvement actions arising from Management Review meetings, (iii) information related to customer feedback/complaints/quality objectives/process & product control, and (iv) previous audit results.
+5.1.2 The review points from para. 5.1.1 shall be incorporated into the Audit Programme for preventive audit - particularly on new, weak, and high-risk areas.
+5.1.3 The Audit Team Leader shall prepare the Audit Programme for either functional compliance to ISO 9001:2015 or performance improvement. The Quality System of the Company shall be audited twice a year. The relevant elements/quality procedure to be audited under each cycle/interval shall be specified in the Internal Audit Programme.
+
+
+5.1.4 The Audit Programme shall be planned in such a way as to avoid peak periods which may clash with other interests.
+5.1.5 The Audit Programme shall be planned according to functional activities or ISO 9001:2015 element basis. The Management Representative shall review and approve the audit programme.
+
+5.1.6 The Audit Team Leader shall prepare the Audit Plan (see Form No. IA-QR-02).
+5.1.7 Auditees shall be informed of the audit by Audit Plan two (2) weeks in advance so as to eliminate the element of surprise.
+5.2 Execution:
+5.2.1 Formation of Audit Team:
+.1 The Audit Team Leader shall form a team of Auditors.
+.2 The Audit Team Leader must have a good working knowledge of ISO 9001:2015 and must also possess sound auditing skills and techniques.
+.3 An Audit Team Member shall be selected on the basis of: technical background; independence: not directly responsible for the operation to be audited; knowledge of auditing skills and techniques.
+5.2.2 Preparation of Checklist:
+The Audit Team Leader, together with the team of Auditors, shall prepare the Audit Checklist (see Form No. IA-QR-03) before the audit.
+5.2.3 Conducting the Audit:
+.1 Pre-Audit Meeting: The Audit Team Leader shall have a formal meeting with the Auditee's representative prior to the commencement of the audit, stating the scope of the audit as tabulated in the Audit Plan and explaining how the audit will operate. The Audit Plan shall be acknowledged by the Auditee. The responsibilities and requirements for planning and conducting audits, and for reporting results and maintaining records shall be defined in a documented procedure.
+
+.2 Actual Audit:
+(a) The Audit Team Member shall use the Audit Checklist to carry out fact-finding and interview of the auditee on his system. Audit Team Members shall be objective in questioning the Auditees.
+
+(b) The Audit Team Member shall ask the Auditee to briefly run through the procedure; stop for clarification if necessary.
+(c) The Audit Team Member shall ask for the work evidence (such as plans, reports, records, minutes, instructions, etc.).
+(d) The Auditors shall exercise a keen sense of observation of all activities in the area and the auditee himself.
+(e) The Audit Team Member may selectively question the staff on his job when necessary.
+.3 Post-Audit Meeting:
+(a) At the end of the audit, the audit team shall hold a meeting with the Auditee's management to present audit findings. At this meeting, the attendees shall agree on a close-out time frame for the corrective actions.
+
+(b) Prior to the Post-Audit Meeting, the audit team shall spend about 30 minutes to consolidate their findings and decide on the number of major/minor CARs to be raised.
+5.2.4 Issue of Corrective Action Request (CAR):
+.1 The Audit Team Member should issue the CAR (refer QP-SMQ-02) to the Auditee during the post-audit meeting. The Auditee must take action on the reported non-conformances and complete them by the stipulated date (e.g., response due date).
+
+.2 The management responsible for the area being audited shall ensure that any necessary corrections and corrective actions are taken without undue delay to eliminate detected nonconformities and their causes.
+.3 The Audit Team Member shall take note of the stipulated date for the evaluation & close-out of the corrected actions.
+.4 The Auditor shall ensure that all CARs are clearly stated and cross-reference the sample taken, e.g., Drawing number, Company's name, and document number.
+5.2.5 Follow-up & Close-out of CAR:
+Auditee should be informed of the next visit to follow-up on the corrective action issued. Audit Team Member should close the nonconformances if actions have been implemented by the Auditee. A copy of the duly completed CAR is to be submitted to the Audit Team Leader for verification/comment and filing.
+
+
+5.2.6 Verification of the Auditors' work:
+The Management Representative shall be responsible for ensuring that the Quality System of the Company is implemented and maintained effectively. He shall constantly check the work of the Internal Audit Team for value-adds and provide guidance to improve the internal auditing function.
+
+5.3 Monitoring (Checking):
+The Management Representative/Audit Team Leader shall check to ensure that during each audit cycle auditors (a) do not audit their own work, (b) audit within the scope of ISO 9001:2015 and requirements of the documented QMS, and (c) Nonconformance Reports/CARs raised are clear and concise and do not raise doubts/ambiguity in the mind of the auditee.
+5.4 Data Analysis / Corrective & Improvement Action:
+5.4.1 Auditors shall collect data/audit evidence via the Audit checklists for analysis and identifying opportunities for improvement.
+5.4.2 The data collected on nonconformities/areas for improvement shall be reverted to the Functional Head to analyze the root-cause(s) of the nonconformance, e.g., man, machine, method, material, mandates, etc., and propose/implement corrective action.
+5.4.3 The Auditor(s) shall initiate a follow-up/audit to assess the effectiveness of corrective action taken in conjunction with the effective date committed by the auditee.
+5.4.4 Further corrective action may be required if the CAR cannot be closed or if corrective action by the auditee is not effective.
+5.4.5 The internal audit findings and proposed improvements shall be forwarded to the Management Team for deliberation in the Management Review meeting, for top management's approval.
+5.4.6 Records of the audit and its results shall be maintained.
+5.4.7 The management responsible for the area being audited shall ensure that any necessary corrections and corrective actions are taken without undue delay to eliminate detected nonconformities and their causes.
+6. Reference Quality Records / Forms:
+Internal Audit Programme 
+Audit Plan 
+Audit Checklist

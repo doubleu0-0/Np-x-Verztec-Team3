@@ -1,0 +1,72 @@
+Tittle: Control of Quality / Technical / Legal Documents & Electronic Data
+Purpose: To define a system for the control of Quality Documents and Data approval, issue and revisions; for the control and distribution of Technical / Legal Documents; and to ensure documents of external origin necessary for the planning and operation are identified and their distribution controlled.
+Scope: This procedure applies to all quality documents (referred to as documented information) used in the company such as Quality Manual, Quality Procedures, Quality Plans (i.e., Operations Control Plan / Inspection & Test Plan) as well as Technical / Legal Documents in use by all Departments.
+Definitions:
+Quality Documents (Documented information): Includes Quality Manual, Quality Procedures, Quality Plans (i.e., Operations Control Plan / Inspection & Test Plan). 
+Quality Manual (QM): A document stating the quality policy and objectives of the company. It describes the quality systems and procedures of an organisation which may be used for internal / external purposes.
+Quality Procedure (QP): A document detailing the purpose and scope of a function and specifying by whom and how it is to be correctly managed.
+Controlled Copy: An identifiable copy of the Quality Manual, Quality Procedure or Quality Plan which is distributed, revised or replaced through a written Document Control Procedure which assures that the document reflects all current requirements.
+Uncontrolled Copy: An identifiable copy of the Quality Manual, Quality Procedure or Quality Plan which is distributed through a Document Control Procedure, but there is no assurance that later, the document always reflects all current requirements. These shall be for information only and shall not be used as reference to perform work.
+Technical / Legal Documents (External documents): Includes Codes / Standards / Regulations.
+Responsibility:
+The Document Controller is responsible for the control and distribution of Quality Manual, Quality Procedures, Quality Plans and external documents identified by the organisation.
+The Functional Heads shall assign their respective Department Document Controller to control the quality documents used in their Department / Functions.
+The respective Functional Heads shall be responsible for the control of Electronic Data.
+The Consultant shall be responsible for the control and distribution of Technical / Legal (i.e., Statutory Regulations) Documents.
+Procedure:
+5.1 Control of Quality Documents 
+5.1.1 Planning: The Document Controller shall plan and initiate a Document Revision Record / Masterlist for all system documents to facilitate control and traceability of these documents from initial release to latest revision level.
+5.1.2 Execution:
+.1 Document Indexing System:
+The Quality Manual section shall be indexed as QM-01 (QM > Quality Manual, 01 > 2 Digit Running Section Number).
+The Quality Procedures shall be indexed as QP-XXX-01 (QP > Quality Procedure, XXX > Functional Name or Quality System Element, 01 > 2 Digit Running Procedure Number).
+The supportive documents (Forms) shall be indexed as XXX-QR-01 (XXX > Functional Name or Quality System Element, QR > Quality Record, 01 > 2 Digit Running Form Number).
+For sub-title and sub-paragraph, use hierarchical numbering (e.g., 1., 1.1, 1.1.1).
+.2 Document Review and Approval Prior to Issue:
+All Quality Documents shall be reviewed and approved by the respective authority prior to issue.
+Quality Manual shall be reviewed by Management Representative and approved by CEO.
+Quality Procedures shall be reviewed by Functional Heads / Deputy Management Representative and approved by the Management Representative.
+.3 Document Receipt Control: Upon receipt of the document, the respective Department / Functional Document Controller assigned by the Functional Head shall ensure the document bears the name and signatory of the Originator, reviewed and approved authorities; correct document number, revision and pages; and legibility of the document. All documents received shall be updated in the "Document Revision Record".
+
+.4 Document Issuance / Retrieval:
+The Document Controller shall use the "Controlled Quality Document Distribution Log" for the issuance or exchange of the Quality Documents with the registered holders.
+All registered document holders are responsible to update their Quality Documents and return the obsolete copies promptly to the respective Document Controller for updating of the Controlled Quality Document Distribution Log and subsequently disposing them.
+The Document Controller shall keep one set in archive for future reference. All obsolete copies shall be stamped "SUPERSEDED" prior to storage.
+
+The Document Controller shall ensure the obsolete documents which need to be retained for legal purposes are filed separately and properly indexed for necessary identification.
+.5 Document Distribution Control:
+The Document Controller shall indicate every copy of the controlled documents to be issued with document control stamp. To prevent unauthorised reproduction of documents, black ink shall not be used for the purpose of document control stamping.
+The Document Controller is responsible for the distribution of the Quality Documents (QM / QP) to all relevant Functional Heads.
+The Functional Heads are responsible to ensure that pertinent issues of appropriate documents are available at all locations where operations essential to the effective functioning of the quality system are performed.
+These documents are issued under controlled / uncontrolled copies where each copy is given a serial number and traceable to the holder.
+The Document Controller shall maintain the "Controlled Quality Document Distribution Log" and / or the "Uncontrolled Quality Document Distribution Log" whereby each issuance of the Quality Documents will be registered.
+The Quality Manual and Procedures issued will include the Quality Manual or Procedure Cover Page with its review and approval signatory column duly signed by respective authorities.
+.6 Standard Quality Record Forms: The standard quality record forms shall be administered by the Document Controller and a Masterlist / Document Revision Record to be maintained. The said Masterlist / Document Revision Record shall be updated quarterly and to be distributed to all sites and Functions for easy reference.
+
+.7 Revision Control for QM / QP:
+To prevent unauthorised changes to the Quality Documents, any changes shall be proposed through the "Change Request Form" to the Management Representative.
+The Initiator must sign the Change Request Form for re-approval and obtain review and approval signatory from the initial review and approval authorities unless designated otherwise.
+The Document Controller is responsible for the distribution of the QM / QP and its changes / amendments using the Controlled Quality Document Distribution Log.
+The Document Controller shall issue the revised procedure and the revised cover page to all registered holders of QM / QP.
+The Functional Heads, respective Document Controllers and registered holders of QM / QP shall be responsible to update the affected documents.
+.8 Control of Electronic Data: The respective Functional Heads shall ensure the following control for electronic data: ensure data diskettes are properly stored to prevent damage, corruption and failure; ensure all foreign diskettes are scanned with virus software before use; ensure all data diskettes and masterlist are updated after each new file is created or cleared; ensure all data diskettes have backup by hard copies and a recovery system maintained; ensure software used are compatible with that of the client's / customer's; and ensure password control for entry or changes for information security.
+5.1.3 Monitoring (Checking) / Effective Actions:
+The Document Controller shall carry out self-check to evaluate and ensure that all actions are in compliance to this procedure, and undertake necessary actions timely for full compliance.
+In addition to this, internal auditors shall check the conformity of this procedure.
+The Document Controller shall, after close-out of all nonconformities from internal / external audits, propose improvement(s) in the Management Review meeting for Top Managements approval.
+5.1.4 Data Analysis / Corrective & Improvement Actions:
+The Document Controller shall undertake effective corrective action(s) to ensure full compliance to this procedure.
+The Document Controller shall pro-actively improve the document control system for better management.
+5.2 Control of Technical / Legal Documents (External documents) 
+5.2.1 Planning: The responsible controllers shall consolidate and list all relevant Technical / Legal documents into Masterlist or Document Revision Record, where appropriate. This applies to all specifications, drawings, codes, standards and regulations.
+5.2.2 Execution:
+.1 Control of Codes / Standards / Regulations (Legal Documents): The Consultant shall maintain all Codes / Standards / Regulations currently in use in a master library. He shall seek confirmation with the relevant Standard Body yearly or as and when required for the latest status on their revision.
+5.2.3 Monitoring (Checking) / Effective Actions:
+The responsible controllers shall perform self-check of all actions required by this procedure and undertake effective actions to assure full compliance.
+The internal auditor shall audit this procedure to ensure full conformity by all personnel involved.
+The responsible controllers shall, after close-out of nonconformities from internal / external audits, propose improvement(s) in the Management Review meeting for top managements approval.
+Reference Quality Records / Forms:
+Controlled Quality Document Distribution Log 
+Uncontrolled Quality Document Distribution Log 
+Document Revision Record 
+Change Request Form
