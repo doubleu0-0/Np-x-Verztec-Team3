@@ -11,8 +11,31 @@ const ALL_COUNTRIES = [
 
 function isAll(list, allList) {
   if (!list) return false;
-  if (typeof list === "string") list = list.split(",");
-  return list.length === allList.length;
+  if (typeof list === "string") {
+    list = list.split(",").map(item => item.trim());
+  }
+  return list.length === allList.length && allList.every(item => list.includes(item));
+}
+
+// Utility function to normalize departments/countries to array format
+function normalizeToArray(data) {
+  if (!data) return [];
+  if (typeof data === "string") {
+    return data.split(",").map(item => item.trim()).filter(item => item.length > 0);
+  }
+  if (Array.isArray(data)) {
+    // Handle nested comma-separated strings in arrays
+    const flattened = [];
+    for (const item of data) {
+      if (typeof item === "string" && item.includes(",")) {
+        flattened.push(...item.split(",").map(subItem => subItem.trim()).filter(subItem => subItem.length > 0));
+      } else {
+        flattened.push(item);
+      }
+    }
+    return flattened;
+  }
+  return [];
 }
 
 const EditFileModal = ({ file, onClose, onSave, currentUser, saving }) => {
@@ -210,28 +233,28 @@ export default function PolicyDocuments({ currentUser }) {
       // Department filter
       if (departmentFilter === 'ALL') return true;
       if (!file.departments) return false;
-      const depts = typeof file.departments === 'string' ? file.departments.split(',').map(d => d.trim()) : file.departments;
+      const depts = normalizeToArray(file.departments);
       return depts.includes(departmentFilter);
     })
     .filter(file => {
       // Country filter
       if (countryFilter === 'ALL') return true;
       if (!file.countries) return false;
-      const countries = typeof file.countries === 'string' ? file.countries.split(',').map(c => c.trim()) : file.countries;
+      const countries = normalizeToArray(file.countries);
       return countries.includes(countryFilter);
     })
     .filter(file => {
       // Department multi-select filter
       if (!selectedDepartments.length) return true;
       if (!file.departments) return false;
-      const depts = typeof file.departments === 'string' ? file.departments.split(',').map(d => d.trim()) : file.departments;
+      const depts = normalizeToArray(file.departments);
       return selectedDepartments.some(dept => depts.includes(dept));
     })
     .filter(file => {
       // Country multi-select filter
       if (!selectedCountries.length) return true;
       if (!file.countries) return false;
-      const countries = typeof file.countries === 'string' ? file.countries.split(',').map(c => c.trim()) : file.countries;
+      const countries = normalizeToArray(file.countries);
       return selectedCountries.some(country => countries.includes(country));
     });
 
