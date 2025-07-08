@@ -51,12 +51,22 @@ import tempfile
 import whisper
 import openai
 from datetime import datetime, timedelta
+import base64
 
-# --- REDIS ---
+# === REDIS ===
 import redis
 from fastapi import Header, Security
 from typer import prompt
 
+# === Email Stuff ===
+import smtplib
+import email.mime.text
+import email.mime.multipart
+MIMEText = email.mime.text.MIMEText
+MIMEMultipart = email.mime.multipart.MIMEMultipart
+import secrets
+import hashlib
+import base64
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = PROJECT_ROOT / "pipeline" / "data" / "raw_data"
@@ -78,7 +88,10 @@ DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 DB_NAME = os.getenv("DB_NAME")
-
+GMAIL_USER = os.getenv("GMAIL_USER")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+EMAIL_SENDER_USER = os.getenv("EMAIL_SENDER_USER")
+EMAIL_SENDER_APP_PASSWORD = os.getenv("EMAIL_SENDER_APP_PASSWORD")
 
 # Connect to Redis
 redis_client = redis.Redis(host='localhost', port=6380, db=0, decode_responses=True)
@@ -303,7 +316,36 @@ async def process_message(
         def questions_stream():
             yield json.dumps({"questions": questions})
         return StreamingResponse(questions_stream(), media_type="application/json")
-
+    
+def send_email(to_email: str, subject: str, body: str, is_html: bool = False, sender: str = GMAIL_USER):
+    """Send email using Gmail SMTP"""
+    try:
+        # Create message
+        msg = MIMEMultipart("alternative")
+        msg["From"] = sender
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        
+        # Add body to email
+        if is_html:
+            msg.attach(MIMEText(body, "html"))
+        else:
+            msg.attach(MIMEText(body, "plain"))
+        
+        # Gmail SMTP configuration
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()  # Enable security
+        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        
+        # Send email
+        text = msg.as_string()
+        server.sendmail(GMAIL_USER, to_email, text)
+        server.quit()
+        
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
 
 @app.post("/stream")
 async def stream_answer(
@@ -314,6 +356,7 @@ async def stream_answer(
     role = current_user.get("role")
     country = current_user.get("country")
     department = current_user.get("department")
+    email = current_user.get("email")
 
     def normalize_key(key):
         return key.strip()
@@ -348,7 +391,12 @@ async def stream_answer(
             "no relevant information found",
             "no answer found",
             "no content",
-            "empty response"
+            "empty response",
+            "there is no",
+            "unfortunately",
+            "i am sorry",
+            "i do not",
+            r"I' couldn't",
         ]
         if resp is None:
             return True
@@ -383,15 +431,37 @@ async def stream_answer(
         print("Empty Response")
         llm_model = get_llm(model_name="llama3.2:latest")
         fallback_text = llm_model.complete(
-            f"You are Verztec's AI HR assistant. The user asked you about: {user_prompt}. "
-            "The information was not found in the index. "
-            "Respond ONLY in this exact format and do not add any extra information, tips, suggestions, or explanations:\n\n"
-            "I am sorry, but I do not have information on (info).\n"
-            "This might be due to a lack of permissions.\n"
-            f"As a {role}, you are allowed to access documents in {country}.\n"
-            f"User role: {role}, country: {country}. User question: {user_prompt}\n"
+            f"You are Verztec's AI HR assistant. The user asked: '{user_prompt}'. "
+            "You do not have information on this topic. "
+            "Reply ONLY with: 'I am sorry, but I do not have information on this topic.' "
+            "Then, state the user's role and country."
+            f" User role: {role}, User country: {country}, User department: {department}."
         )
         raw_text = fallback_text.text.strip()
+
+            # --- Send fallback email ---
+        try:
+            sender = EMAIL_SENDER_USER
+            recipient = GMAIL_USER
+            subject = "[AI HR Fallback] User Query Needs Attention"
+            user_email = current_user.get("email", "unknown")
+            department = current_user.get("department", "unknown")
+            msg_body = (
+                f"User info: role={role}, country={country}, department={department}, email={user_email}\n\n"
+                f"User query:\n{user_prompt}\n\n"
+                f"Chatbot response:\n{raw_text}\n"
+            )
+            send_email(
+                to_email=recipient,
+                subject=subject,
+                body=msg_body,
+                is_html=False,  # plain text for clarity
+                sender=sender
+            )
+
+        except Exception as e:
+            print(f"[Fallback Email] Failed to send fallback email: {e}")
+
         def fallback_stream():
             yield raw_text
         return StreamingResponse(fallback_stream(), media_type="text/plain")
@@ -866,7 +936,7 @@ async def upload_xlsx(
                         detail=f"Department must be {current_user['department']}"
                     )
 
-            if not isinstance(email, str) or not email.endswith("@gmail.com"):
+            if not isinstance(email, str) or not (email.endswith("@verztec.com") or email.endswith("@gmail.com")): # THE @GMAIL IS ONLY FOR TESTING THE EMAIL SENDING
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid or missing email"
@@ -1349,7 +1419,6 @@ async def update_user(
             for log in audit_logs:
                 cursor.execute(
                     """
-                    INSERT INTO user_update_logs (target_username, changed_by_username, field_name, old_value, new_value, changed_at)
                     VALUES (%s, %s, %s, %s, %s, %s)
                     """,
                     (
@@ -1673,3 +1742,165 @@ def normalize_metadata_format(metadata):
             normalized["countries"] = new_countries
     
     return normalized
+
+
+# Password reset models
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    user_id: int
+    new_password: str
+
+
+@app.post("/forgot-password")
+async def forgot_password(request: PasswordResetRequest, req: Request):
+    """Send password reset link to user's email"""
+    try:
+        conn = get_db()
+        with conn.cursor() as cursor:
+            # Check if user exists
+            cursor.execute("SELECT user_id, username FROM users WHERE email = %s", (request.email,))
+            user = cursor.fetchone()
+            
+            # Log the password reset request attempt (regardless of whether user exists)
+            user_ip = req.client.host
+            user_agent = req.headers.get("user-agent", "")
+            
+            cursor.execute("""
+                INSERT INTO password_reset_audit (
+                    reset_type, target_email, target_username, user_ip, user_agent, reset_at
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                "REQUESTED",
+                request.email,
+                user["username"] if user else None,
+                user_ip,
+                user_agent,
+                datetime.now()
+            ))
+            
+            if not user:
+                conn.commit()
+                # Don't reveal whether email exists or not for security
+                return {"message": "If the email exists, a password reset link has been sent."}
+            
+            # Generate reset token
+            reset_token = secrets.token_urlsafe(32)
+            reset_token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
+            
+            # Store reset token in database (expires in 1 hour)
+            expire_time = datetime.now() + timedelta(hours=1)
+            cursor.execute("""
+                INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE token_hash = %s, expires_at = %s
+            """, (user["user_id"], reset_token_hash, expire_time, reset_token_hash, expire_time))
+            
+            conn.commit()
+            
+            # Create reset link
+            reset_link = f"http://localhost:3000/reset-password?token={reset_token}&user_id={user['user_id']}"
+            
+            # Email content
+            subject = "Password Reset Request - Verztec HR System"
+            body = f"""
+            <html>
+            <body>
+                <h2>Password Reset Request</h2>
+                <p>Hello {user['username']},</p>
+                <p>You have requested to reset your password for the Verztec HR System.</p>
+                <p>Click the link below to reset your password:</p>
+                <p><a href="{reset_link}" style="background-color: #EAB308; color: black; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a></p>
+                <p>This link will expire in 1 hour.</p>
+                <p>If you did not request this password reset, please ignore this email.</p>
+                <br>
+                <p>If you have any questions, please contact our IT support at <a href="mailto:it-support@verztec.com">it-support@verztec.com</a> or call +65 1234 5678.</p>
+                <br>
+                <p>Best regards,<br>Verztec HR System</p>
+            </body>
+            </html>
+            """
+            
+            # Send email
+            email_sent = send_email(request.email, subject, body, is_html=True)
+            
+            if email_sent:
+                return {"message": "If the email exists, a password reset link has been sent."}
+            else:
+                raise HTTPException(status_code=500, detail="Failed to send email")
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in forgot_password: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        conn.close()
+
+@app.post("/reset-password")
+async def reset_password(request: PasswordResetConfirm, req: Request):
+    """Reset password using token"""
+    try:
+        conn = get_db()
+        with conn.cursor() as cursor:
+            # Verify token
+            token_hash = hashlib.sha256(request.token.encode()).hexdigest()
+            cursor.execute("""
+                SELECT user_id FROM password_reset_tokens 
+                WHERE user_id = %s AND token_hash = %s AND expires_at > %s
+            """, (request.user_id, token_hash, datetime.now()))
+            
+            token_record = cursor.fetchone()
+            if not token_record:
+                raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+            
+            # Get user details for audit log
+            cursor.execute("SELECT username, email FROM users WHERE user_id = %s", (request.user_id,))
+            user_details = cursor.fetchone()
+            
+            # Hash new password
+            new_password_hash = hash_password(request.new_password)
+            
+            # Update password
+            cursor.execute("""
+                UPDATE users SET password_hash = %s, updated_at = %s 
+                WHERE user_id = %s
+            """, (new_password_hash, datetime.now(), request.user_id))
+            
+            # Log the successful password reset
+            user_ip = req.client.host
+            user_agent = req.headers.get("user-agent", "")
+            
+            cursor.execute("""
+                INSERT INTO password_reset_audit (
+                    reset_type, target_email, target_username, user_ip, user_agent, 
+                    reset_token_used, reset_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                "COMPLETED",
+                user_details["email"] if user_details else None,
+                user_details["username"] if user_details else None,
+                user_ip,
+                user_agent,
+                token_hash[:16] + "...",  # Store partial token for audit (first 16 chars)
+                datetime.now()
+            ))
+            
+            # Delete used token
+            cursor.execute("DELETE FROM password_reset_tokens WHERE user_id = %s", (request.user_id,))
+            
+            conn.commit()
+            
+            return {"message": "Password reset successfully"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in reset_password: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        conn.close()
+
+

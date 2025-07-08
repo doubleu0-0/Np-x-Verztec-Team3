@@ -11,6 +11,7 @@ This script is run by an EC2 instance triggered by a lambda function whenever an
 
 The trigger for the lambda function is the uploading of the __trigger__.ready file into S3 (Make sure to upload it first, so it gets processed last).
 
+The rest of the files (Adding Users.xlsx) are to be mounted to expose for our app
 ---
 
 ## Table of Contents

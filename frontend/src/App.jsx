@@ -16,6 +16,7 @@ import GLBAvatar from '@/components/GLBAvatar';
 import { TTSProvider } from '@/contexts/TTSContext';
 import AdminConsole from '@/components/AdminConsole';
 import AdminPasswordPrompt from '@/components/AdminPasswordPrompt';
+import PasswordReset from './components/PasswordReset';
 
 const models = [
   {
@@ -66,6 +67,7 @@ function AppContent() {
   const [chats, setChats] = useState([]);
   const [filteredChats, setFilteredChats] = useState([]);
   const [markdownContent, setMarkdownContent] = useState('');
+  const [isPasswordReset, setIsPasswordReset] = useState(false);
   
   const modelDropdownRef = useRef(null);
 
@@ -210,12 +212,37 @@ function AppContent() {
 
   const currentModel = models.find(m => m.name === selectedModel);
 
+  // Add useEffect to check URL parameters for password reset
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const userId = urlParams.get('user_id');
+    
+    if (token && userId) {
+      setIsPasswordReset(true);
+    }
+  }, []);
+
+  // If it's a password reset, show the password reset component BEFORE the login check
+  if (isPasswordReset) {
+    return (
+      <div className={isDarkMode ? 'dark' : ''}>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+          <PasswordReset 
+            onComplete={() => {
+              setIsPasswordReset(false);
+              // Clear URL parameters
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (!isLoggedIn) {
     return (
-      <div
-        className="min-h-screen bg-cover bg-center flex items-center justify-center"
-        style={{ backgroundImage: "url('/src/assets/images/background.png')" }}
-      >
+      <div className={isDarkMode ? 'dark' : ''}>
         <SignIn onLogin={handleLogin} />
       </div>
     );

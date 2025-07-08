@@ -111,3 +111,26 @@ CREATE TABLE file_update_logs (
   new_value TEXT,
   changed_at DATETIME NOT NULL
 );
+
+-- PASSWORD RESET AUDIT
+CREATE TABLE IF NOT EXISTS password_reset_audit (
+    audit_id INT AUTO_INCREMENT PRIMARY KEY,
+    reset_type ENUM('REQUESTED', 'COMPLETED') NOT NULL,
+    target_email VARCHAR(255) NOT NULL,
+    target_username VARCHAR(100),
+    user_ip VARCHAR(45),
+    user_agent TEXT,
+    reset_token_used VARCHAR(64),
+    reset_at DATETIME NOT NULL,
+    INDEX idx_reset_at (reset_at),
+    INDEX idx_target_email (target_email),
+    INDEX idx_reset_type (reset_type)
+);
+
+-- PASSWORD RESET TOKENS
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    user_id INT PRIMARY KEY,
+    token_hash VARCHAR(64) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
