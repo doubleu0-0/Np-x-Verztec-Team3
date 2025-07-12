@@ -17,6 +17,7 @@ import GLBAvatar from '@/components/GLBAvatar';
 import { TTSProvider } from '@/contexts/TTSContext';
 import AdminConsole from '@/components/AdminConsole';
 import AdminPasswordPrompt from '@/components/AdminPasswordPrompt';
+import MuteButton from '@/components/MuteButton'; // ✅ Import MuteButton
 
 const models = [
   {
@@ -48,7 +49,7 @@ const avatarNames = {
   avatar6: "Her"
 };
 
-function AppContent() {
+function AppContent({ selectedAvatar, setSelectedAvatar }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -59,7 +60,6 @@ function AppContent() {
   const [view, setView] = useState('chat');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
-  const [selectedAvatar, setSelectedAvatar] = useState('avatar6');
   const [selectedLogId, setSelectedLogId] = useState(null);
   const [adminPasswordVerified, setAdminPasswordVerified] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -67,7 +67,9 @@ function AppContent() {
   const [chats, setChats] = useState([]);
   const [filteredChats, setFilteredChats] = useState([]);
   const [markdownContent, setMarkdownContent] = useState('');
-  
+  const [selectedChatMessages, setSelectedChatMessages] = useState([]);
+  const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
+
   const modelDropdownRef = useRef(null);
 
   // Load chats when user logs in
@@ -81,16 +83,17 @@ function AppContent() {
   const loadChats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/search?q=', {
+      const response = await fetch('http://localhost:8000/chat-history/titles', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       
       if (response.ok) {
-        const chatData = await response.json();
-        setChats(chatData);
-      }
+        const chatTitles = await response.json();
+        setChats(chatTitles);
+        setFilteredChats(chatTitles); // show all chats initially
+        
     } catch (error) {
       console.error('Failed to load chats:', error);
     }
@@ -144,10 +147,32 @@ function AppContent() {
     setIsDarkMode(prev => !prev);
   };
 
-  const handleNewChat = () => {
-    setView('chat');
-    setSelectedLogId(null);
+  const handleNewChat = async () => {
+    const newId = crypto.randomUUID();
+    setConversationId(newId);
+    setSelectedLogId(newId);
+    setSelectedChatMessages([]);
     setIsSidebarOpen(false);
+    setView('chat');
+    await loadChats(); // Always reload chat list after new chat
+  };
+
+  const loadChatMessages = async (conversation_id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8000/chat-history/${conversation_id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const chatMessages = await response.json();
+        setSelectedChatMessages(chatMessages);
+      }
+    } catch (error) {
+      console.error('Failed to load chat messages:', error);
+    }
   };
 
   const handleSearch = () => {
@@ -181,6 +206,11 @@ function AppContent() {
     localStorage.removeItem('token');
     setIsLoggedIn(false);
     setSelectedProfile(null);
+    setChats([]);
+    setFilteredChats([]);
+    setSelectedChatMessages([]);
+    setSelectedLogId(null);
+    setView('chat');  // Optional: Reset view    
   };
 
   const handleAvatarChange = (avatarName) => {
@@ -193,20 +223,44 @@ function AppContent() {
     setIsSidebarOpen(false);
   };
 
-  const handleChatSelect = (logId) => {
-    setSelectedLogId(logId);
+  const handleChatSelect = async(conversation_id) => {
+    setSelectedLogId(conversation_id);
+    setConversationId(conversation_id); // Set conversationId here
     setView('chat');
     setIsSidebarOpen(false);
     setIsSearchOpen(false);
-  };
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8000/chat-history/${conversation_id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    if (response.ok) {
+      const fullChat = await response.json();
+      console.log("Fetched messages for conversation", conversation_id, fullChat); // 👈 ADD THIS
+      setSelectedChatMessages(fullChat);  // Set full chat here
+    } else {
+      console.warn("Chat history not found or failed for", conversation_id);
+      setSelectedChatMessages([]);  // Clear if no chat
+    }
+  } catch (error) {
+    console.error('Failed to load chat messages:', error);
+    setSelectedChatMessages([]);
+  }
+};
 
   const handleCloseSidebar = () => {
     setIsSidebarOpen(false);
   };
 
   // Add function to refresh chats when a new chat is created
-  const handleNewChatCreated = () => {
-    loadChats();
+  const handleNewChatCreated = async (newConversationId) => {
+    await loadChats(); // Wait for chats to load
+    setSelectedLogId(newConversationId); // Select the new chat
+    setConversationId(newConversationId); // Set conversationId for new chat
+    setView('chat'); // Ensure chat view is active
+    // Optionally, load messages for the new chat if available
+    await loadChatMessages(newConversationId);
   };
 
   const currentModel = models.find(m => m.name === selectedModel);
@@ -352,24 +406,18 @@ function AppContent() {
               <div className="space-y-1">
                 {filteredChats.map((chat) => (
                   <button
-                    key={chat.log_id}
-                    onClick={() => handleChatSelect(chat.log_id)}
+                    key={chat.conversation_id}
+                    onClick={() => handleChatSelect(chat.conversation_id)}
                     className={`
                       w-full text-left p-3 rounded-md transition-colors
-                      ${selectedLogId === chat.log_id 
-                        ? 'bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-yellow-500' 
+                      ${selectedLogId === chat.conversation_id
+                        ? 'bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-yellow-500'
                         : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                       }
                     `}
                   >
                     <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
-                      {chat.query || 'Untitled Chat'}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
-                      {chat.response?.substring(0, 100) || 'No preview available'}
-                    </div>
-                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      {new Date(chat.created_at).toLocaleDateString()}
+                      {chat.title || 'Untitled Chat'}
                     </div>
                   </button>
                 ))}
@@ -483,6 +531,8 @@ function AppContent() {
                       </div>
                     )}
                   </div>
+                  {/* Add MuteButton here */}
+                  <MuteButton />                  
                 </div>
                 
                 <div className="flex items-center gap-2 order-1 sm:order-2">
@@ -545,6 +595,9 @@ function AppContent() {
                     setSelectedModel={setSelectedModel}
                     selectedLogId={selectedLogId}
                     onNewChatCreated={handleNewChatCreated}
+                    messages={selectedChatMessages}
+                    conversationId={conversationId} // ⬅ ADD THIS
+                    setConversationId={setConversationId} // ⬅ ADD THIS     
                   />
                 )}
                 {view === 'feedback' && (
@@ -595,9 +648,13 @@ function AppContent() {
 
 // Main App component wrapped with TTSProvider
 function App() {
+  const [selectedAvatar, setSelectedAvatar] = useState('avatar6');
   return (
-    <TTSProvider>
-      <AppContent />
+    <TTSProvider selectedAvatar={selectedAvatar}>
+      <AppContent 
+        selectedAvatar={selectedAvatar}
+        setSelectedAvatar={setSelectedAvatar}
+      />
     </TTSProvider>
   );
 }
