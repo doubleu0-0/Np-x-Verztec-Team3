@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Users, UserPlus, FileText, Upload, Moon, Sun, LogOut, ArrowLeft, Search, ChevronUp, ChevronDown, MoreVertical, X } from 'lucide-react';
+import { Users, UserPlus, FileText, Upload, Moon, Sun, LogOut, ArrowLeft, Search, ChevronUp, ChevronDown, MoreVertical, X, MessageSquare } from 'lucide-react';
 import UploadXlsxButton from './UploadXlsxButton';
 import UploadFile from './UploadFile';
-import PolicyDocuments from './PolicyDocuments'; // Add this import
+import PolicyDocuments from './PolicyDocuments';
+import UserManagement from './UserManagement';
+import ViewFeedback from './ViewFeedback'; // Add this import
 import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
-import UserManagement from './UserManagement'; // Add this at the top
+
 const ALL_COUNTRIES = ['Singapore', 'United Kingdom', 'United States', 'Thailand', 
   'Indonesia', 'Korea', 'China', 'Japan', 'Vietnam', 'Myanmar'];
 const ALL_DEPARTMENTS = ['Human Resource', 'Admin & Operations', 'Project Management',
   'Procurement', 'IT', 'Marketing', 'Business Development', 'Finance', 'Service Delivery'];
+
 const AdminSidebar = ({ activeTab, setActiveTab, isDarkMode, userProfile, toggleTheme, handleLogout }) => {
   const menuItems = [
     { id: 'users', label: 'User Management', icon: Users },
     { id: 'addUser', label: 'Add Users', icon: UserPlus },
     { id: 'policies', label: 'Policy Management', icon: FileText },
     { id: 'documents', label: 'Upload Documents', icon: Upload },
+    { id: 'feedback', label: 'View Feedback', icon: MessageSquare }, // Add this line
   ];
 
   return (
@@ -114,8 +118,14 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
         );
       case 'documents':
         return (
-          <div className="pt-0   pb-0 px-6">
+          <div className="pt-0 pb-0 px-6">
             <UploadFile />
+          </div>
+        );
+      case 'feedback': // Add this case
+        return (
+          <div className="pt-0 pb-0 px-6">
+            <ViewFeedback />
           </div>
         );
       default:
@@ -165,6 +175,7 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
               {activeTab === 'addUser' && 'Add Users'}
               {activeTab === 'policies' && 'Policy Management'}
               {activeTab === 'documents' && 'Upload Documents'}
+              {activeTab === 'feedback' && 'View Feedback'} {/* Add this line */}
             </h2>
           </div>
           {renderContent()}
