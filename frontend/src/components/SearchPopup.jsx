@@ -12,7 +12,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
   // Simple highlight function for user query text (returns html string)
   const highlightQuery = (text, keyword) => {
     if (!keyword.trim()) return text;
-    const words = keyword.trim().toLowerCase().split(/\s+/);
+    const words = keyword.trim().toLowerCase().split(/\s+/);6
     let highlighted = text;
 
     words.forEach((word) => {
@@ -51,11 +51,15 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     };
   }, [isOpen, onClose]);
 
-  // Fetch recent chats API call (for when no search query, just show latest chats)
   const fetchRecentChats = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:8000/search?q=");
+      const token = localStorage.getItem('token');
+      const res = await axios.get("http://localhost:8000/search?q=", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       setResults(res.data);
     } catch (err) {
       console.error("Failed to fetch recent chats:", err);
@@ -63,31 +67,23 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     setLoading(false);
   };
 
-  // Handle the actual search API call based on user's input query
   const handleSearch = async (searchTerm) => {
-    if (!searchTerm.trim()) return; // no empty searches pls
+    if (!searchTerm.trim()) return;
     setLoading(true);
     try {
-      const res = await axios.get(`http://localhost:8000/search?q=${searchTerm}`);
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`http://localhost:8000/search?q=${searchTerm}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       setResults(res.data);
-
-      // Auto-scroll to first result if search query is at least 3 characters
-      if (searchTerm.trim().length >= 3 && res.data.length > 0) {
-        setTimeout(() => {
-          if (firstMatchRef.current) {
-            firstMatchRef.current.scrollIntoView({
-              behavior: "smooth",
-              block: "start"
-            });
-          }
-        }, 100); // Small delay so results can render first
-      }
-
+      // ...existing code...
     } catch (err) {
       console.error("Search failed:", err);
     }
     setLoading(false);
-  };
+  };  
 
   // Debounced input handler for search input box like for that automatic search-as-you-type experience
   const handleInputChange = (e) => {
@@ -110,13 +106,20 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     fetchRecentChats();
   };
 
-  const handleChatClick = (logId) => {
+  // const handleChatClick = (logId) => {
+  //   if (onChatSelect) {
+  //     onChatSelect(logId);  // ✅ notify App about clicked chat
+  //   } else {
+  //     onClose();
+  //   }
+  // };
+  const handleChatClick = (conversationId) => {
     if (onChatSelect) {
-      onChatSelect(logId);  // ✅ notify App about clicked chat
+      onChatSelect(conversationId);  // Pass conversation_id, not log_id
     } else {
       onClose();
     }
-  };
+  };  
 
   const smartPreview = (text, keyword, fallbackWordLimit = 20) => {
     if (!text) return "";
@@ -282,65 +285,33 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
         {/* The results list itself, scrollable with nice scrollbar styling */}
         <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
           {results.map((chat, index) => {
-            if (!chat.query.trim()) return null;
+            if (!chat.preview || !chat.preview.trim()) return null;
 
-            const searchWordCount = query.trim().split(/\s+/).length;
+            const highlightedPreview = highlightQuery(chat.preview, query);
 
-            if (searchWordCount > 4) {
-              // Show only the user question with highlighted search terms
-              const highlightedQuery = highlightQuery(chat.query, query);
-              if (!highlightedQuery.trim()) return null;
-
-              return (
-                <div
-                  key={chat.log_id}
-                  ref={index === 0 ? firstMatchRef : null}
-                  className="group cursor-pointer transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 p-3 rounded-lg text-gray-900 dark:text-white"
-                  onClick={() => handleChatClick(chat.log_id)}
-                >
-                  <p
-                    className="text-sm line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: highlightedQuery }}
-                  ></p>
-                  <small className="text-xs text-gray-600 dark:text-gray-300 block mt-1 opacity-0 group-hover:opacity-100 transition">
-                    {formatChatTime(chat.created_at)}
-                  </small>
-                </div>
-              );
-            } else {
-              // fallback to existing behaviour - show bot response with smartPreview
-              const html = smartPreview(chat.response, query);
-              if (!html.trim()) return null;
-
-              return (
-                <div
-                  key={chat.log_id}
-                  ref={index === 0 ? firstMatchRef : null}
-                  className="group cursor-pointer transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 p-3 rounded-lg text-gray-900 dark:text-white"
-                  onClick={() => handleChatClick(chat.log_id)}
-                >
-                  <p
-                    className="text-sm line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: html }}
-                  ></p>
-                  <small className="text-xs text-gray-600 dark:text-gray-300 block mt-1 opacity-0 group-hover:opacity-100 transition">
-                    {formatChatTime(chat.created_at)}
-                  </small>
-                </div>
-              );
-            }
-          })}
-          {/* Show no matches message if no results with previews */}
-          {!loading && results.filter(chat => {
-            const count = query.trim().split(/\s+/).length;
-            if (count >= 4) {
-              return chat.query.trim();
-            } else {
-              return smartPreview(chat.response, query).trim();
-            }
-          }).length === 0 && (
+            return (
+              <div
+                key={chat.conversation_id}
+                ref={index === 0 ? firstMatchRef : null}
+                className="group cursor-pointer transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 p-3 rounded-lg text-gray-900 dark:text-white"
+                onClick={() => handleChatClick(chat.conversation_id)}
+              >
+                <h3 className="text-base font-normal mb-1 line-clamp-1">
+                  {chat.title?.trim() ? chat.title : "Untitled Chat"}
+                </h3>              
+                <p
+                  className="text-sm line-clamp-2"
+                  dangerouslySetInnerHTML={{ __html: highlightedPreview }}
+                ></p>
+                <small className="text-xs text-gray-600 dark:text-gray-300 block mt-1 opacity-0 group-hover:opacity-100 transition">
+                  {formatChatTime(chat.created_at)}
+                </small>
+              </div>
+            );
+          })}          
+          {!loading && results.filter(chat => chat.preview && chat.preview.trim()).length === 0 && (
             <p className="text-sm text-gray-400 dark:text-gray-500">No matches found.</p>
-          )}
+          )}          
         </div>
       </div>
     </div>
