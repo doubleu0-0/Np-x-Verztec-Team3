@@ -8,6 +8,7 @@ import ProfileDropdown from '@/components/ProfileDropdown';
 import ModelSelector from '@/components/ModelSelector';
 import UploadXlsxButton from '@/components/UploadXlsxButton';
 import UploadFile from '@/components/UploadFile';
+import Feedback from '@/components/Feedback';
 import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
 import ReactMarkdown from 'react-markdown';
@@ -494,6 +495,18 @@ function AppContent() {
                     Chat
                   </button>
 
+                  <button
+                    onClick={() => {
+                      setView('feedback');
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`px-4 py-2 text-sm rounded font-medium transition-colors ${
+                      view === 'feedback' ? 'bg-yellow-500 text-black' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                    }`}
+                  >
+                    Feedback
+                  </button>
+
                   {(userProfile?.role === 'ADMIN' || userProfile?.role === 'MANAGER') && (
                     <button
                       onClick={handleAdminConsole}
@@ -532,6 +545,12 @@ function AppContent() {
                     setSelectedModel={setSelectedModel}
                     selectedLogId={selectedLogId}
                     onNewChatCreated={handleNewChatCreated}
+                  />
+                )}
+                {view === 'feedback' && (
+                  <Feedback 
+                    userProfile={userProfile}
+                    isDarkMode={isDarkMode}
                   />
                 )}
                 {view === 'uploadXlsx' && <UploadXlsxButton />}
