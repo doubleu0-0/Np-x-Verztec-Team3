@@ -1624,3 +1624,95 @@ def delete_docs_by_filename(filename):
             print(f"Deleted meta file: {meta_path}")
         except Exception as e:
             print(f"Error deleting meta file {meta_path}: {e}")
+            
+class FeedbackCreate(BaseModel):
+    category: str
+    message: str
+    rating: Optional[int] = None
+    
+@app.post("/feedback")
+async def create_feedback(feedback: FeedbackCreate):
+    try:
+        connection = get_db()  # Use your existing get_db function
+        cursor = connection.cursor()
+        query = "INSERT INTO feedback (category, message, rating) VALUES (%s, %s, %s)"
+        cursor.execute(query, (feedback.category, feedback.message, feedback.rating))
+        connection.commit()
+        cursor.close()
+        connection.close()
+        return {"message": "Feedback submitted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class FeedbackStatusUpdate(BaseModel):
+    status: str
+
+class FeedbackResponse(BaseModel):
+    id: int
+    message: str
+    category: str
+    rating: Optional[int]
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    
+@app.get("/api/feedback", response_model=List[FeedbackResponse])
+async def get_feedback(current_user: dict = Depends(get_current_user)):
+    try:
+        connection = get_db()
+        cursor = connection.cursor()
+        
+        # Fetch all feedback from database
+        query = """
+        SELECT id, message, category, rating, status, created_at, updated_at 
+        FROM feedback 
+        ORDER BY created_at DESC
+        """
+        cursor.execute(query)
+        feedbacks = cursor.fetchall()
+        
+        cursor.close()
+        connection.close()
+        
+        return feedbacks
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching feedback: {str(e)}")
+
+@app.put("/api/feedback/{feedback_id}/status")
+async def update_feedback_status(
+    feedback_id: int, 
+    status_update: FeedbackStatusUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        
+        # Validate status
+        valid_statuses = ["pending", "reviewed", "resolved"]
+        if status_update.status not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+        
+        connection = get_db()
+        cursor = connection.cursor()
+        
+        # Check if feedback exists
+        check_query = "SELECT id FROM feedback WHERE id = %s"
+        cursor.execute(check_query, (feedback_id,))
+        if not cursor.fetchone():
+            cursor.close()
+            connection.close()
+            raise HTTPException(status_code=404, detail="Feedback not found")
+        
+        # Update feedback status
+        update_query = "UPDATE feedback SET status = %s, updated_at = NOW() WHERE id = %s"
+        cursor.execute(update_query, (status_update.status, feedback_id))
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        return {"message": "Feedback status updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating feedback status: {str(e)}")
