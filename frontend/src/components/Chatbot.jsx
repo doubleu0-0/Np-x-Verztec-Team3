@@ -5,45 +5,45 @@ import ChatInput from '@/components/ChatInput';
 import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
 import ModelSelector from '@/components/ModelSelector';
+import { useTTS } from '@/contexts/TTSContext';
 
-
-function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId = null, onNewChatCreated }) {
-  const [messages, setMessages] = useImmer([]); // Stores chat messages
-  const [newMessage, setNewMessage] = useState(''); // Stores the current input message
-  const [status, setStatus] = useState(''); // Which phase the bot is in (Searching database, preprocessing, etc)
+function Chatbot({
+  userProfile,
+  selectedModel,
+  setSelectedModel,
+  selectedLogId = null,
+  onNewChatCreated,
+  messages: initialMessages = [],
+  conversationId,
+  setConversationId  
+}) {
+  const [messages, setMessages] = useImmer([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [status, setStatus] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [loadingLog, setLoadingLog] = useState(false); 
-  const messagesEndRef = useRef(null); // Just for auto scrolling
+  const [loadingLog, setLoadingLog] = useState(false);
+  const messagesEndRef = useRef(null);
+  // const [conversationId, setConversationId] = useState(null);
 
   const isLoading = messages.length && messages[messages.length - 1].loading;
+  const { speakText } = useTTS();
 
-    // Chat log loading logic
   useEffect(() => {
-    if (!selectedLogId) return;
+    if (initialMessages) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages, setMessages]);
 
-    const fetchLog = async () => {
-      setLoadingLog(true);
-      setStatus('🔄 Loading previous chat...');
-      try {
-        const res = await fetch(`http://localhost:8000/chat-log/${selectedLogId}`);
-        if (!res.ok) throw new Error(`Failed to load chat log: ${res.status}`);
-        const data = await res.json();
-        if (!data.messages) throw new Error('Invalid data format');
+  useEffect(() => {
+    // Stop any ongoing TTS when switching to a new chat or clearing messages
+    window.speechSynthesis.cancel();
 
-        setMessages(data.messages);
-        setStatus('✅ Chat loaded.');
-      } catch (err) {
-        console.error(err);
-        setStatus(`✗ Could not load chat: ${err.message}`);
-      } finally {
-        setLoadingLog(false);
-      }
-    };
+    if (selectedLogId === null) {
+      setMessages([]);
+      setStatus('');
+    }
+  }, [selectedLogId]);
 
-    fetchLog();
-  }, [selectedLogId, setMessages]);
-
-  // Auto scrolling
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -56,15 +56,24 @@ function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId =
     return () => observer.disconnect();
   }, []);
 
-
   async function submitNewMessage() {
     const trimmedMessage = newMessage.trim();
     if (!trimmedMessage || isLoading) return;
 
-    // Call this when starting a new chat
-    if (messages.length === 0 && onNewChatCreated) {
-      onNewChatCreated();
+    // if (messages.length === 0 && onNewChatCreated) {
+    //   const newId = crypto.randomUUID();
+    //   setConversationId(newId);
+    //   onNewChatCreated(newId);
+    // }
+    let finalConversationId = conversationId;
+    if (!finalConversationId) {
+      finalConversationId = crypto.randomUUID();
+      setConversationId(finalConversationId);
+      if (onNewChatCreated) {
+        onNewChatCreated(finalConversationId);
+      }
     }
+
 
     setMessages(draft => {
       draft.push({ role: 'user', content: trimmedMessage });
@@ -81,7 +90,11 @@ function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId =
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: trimmedMessage, model: selectedModel }),
+        body: JSON.stringify({
+          message: trimmedMessage,
+          model: selectedModel,
+          conversation_id: finalConversationId
+        }),
       });
 
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -89,7 +102,6 @@ function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId =
       let parsedQuestions = [];
 
       if (contentType && contentType.includes("application/json")) {
-        // Read the stream as text, then parse JSON
         let text = "";
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -107,7 +119,7 @@ function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId =
           return;
         }
         parsedQuestions = data.questions || [];
-        // Only call /stream if there are questions
+
         if (parsedQuestions.length === 0) {
           setStatus("No HR-related questions found.");
           setMessages(draft => {
@@ -116,7 +128,6 @@ function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId =
           return;
         }
       } else {
-        // Fallback streaming response (not questions)
         let text = "";
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -142,9 +153,11 @@ function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId =
 
         setMessages(draft => {
           if (draft[assistantIndex]) draft[assistantIndex].loading = false;
+          const finalResponse = draft[assistantIndex].content;
+          speakText(finalResponse);
         });
         setStatus("");
-        return; // Do NOT call /stream
+        return;
       }
 
       setStatus(`Extracted ${parsedQuestions.length} question(s).`);
@@ -177,21 +190,24 @@ function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId =
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: questionText, model: selectedModel }),
-      });
+        // body: JSON.stringify({ message: questionText, model: selectedModel })
+        body: JSON.stringify({
+          message: questionText,
+          model: selectedModel,
+          conversation_id: conversationId   // ✅ add this line
+        }),
+     });
 
       if (!res.ok) throw new Error(`Stream error: ${res.status}`);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let done = false;
-      let gotAny = false;
 
       while (!done) {
         const { value, done: doneReading } = await reader.read();
         done = doneReading;
         if (value) {
-          gotAny = true;
           const chunk = decoder.decode(value);
           setMessages(draft => {
             if (!draft[assistantIndex]) return;
@@ -204,7 +220,7 @@ function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId =
         if (!draft[assistantIndex]) return;
         draft[assistantIndex].loading = false;
       });
-      
+
       setStatus("Done :)");
     } catch (err) {
       setStatus(`✗ Stream error: ${err.message}`);
@@ -226,15 +242,15 @@ function Chatbot({ userProfile, selectedModel, setSelectedModel, selectedLogId =
           <div><b>Department:</b> {userProfile.department}</div>
         </div>
       )}
+
       <div className="flex-1 overflow-y-auto px-4 pt-6 min-h-0">
         {messages.length === 0 ? (
           <>
-            {/* Centered Verztec logo and title */}
             <div className="flex flex-col items-center mb-6">
-              <img src={isDarkMode ? white_logo : logo} className="w-32 mb-2" alt="logo" /> 
+              <img src={isDarkMode ? white_logo : logo} className="w-32 mb-2" alt="logo" />
               <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
-              Verztec's AI Assistant
-            </h1>
+                Verztec's AI Assistant
+              </h1>
             </div>
             <div className="font-urbanist text-primary-blue text-xl font-light space-y-2 text-center">
               <p>👋 Hi there!</p>

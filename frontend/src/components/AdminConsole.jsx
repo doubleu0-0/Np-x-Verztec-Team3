@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Users, UserPlus, FileText, Upload, Moon, Sun, LogOut, ArrowLeft, Search, ChevronUp, ChevronDown, MoreVertical, X } from 'lucide-react';
+import { Users, UserPlus, FileText, Upload, Moon, Sun, LogOut, ArrowLeft, Search, ChevronUp, ChevronDown, MoreVertical, X, MessageSquare } from 'lucide-react';
 import UploadXlsxButton from './UploadXlsxButton';
 import UploadFile from './UploadFile';
 import PolicyDocuments from './PolicyDocuments'; // Add this import
 import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
+import ViewFeedback from './ViewFeedback'; 
 import UserManagement from './UserManagement'; // Add this at the top
 import DatabaseLogs from './DatabaseLogs'; // Import DatabaseLogs component
 import { ChevronRight } from 'lucide-react'; // Add these icons
@@ -45,6 +46,7 @@ const AdminSidebar = ({
     { id: 'addUser', label: 'Add Users', icon: UserPlus },
     { id: 'policies', label: 'Policy Management', icon: FileText },
     { id: 'documents', label: 'Upload Documents', icon: Upload },
+    { id: 'feedback', label: 'View Feedback', icon: MessageSquare },
   ];
 
   return (
@@ -246,6 +248,12 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
         return (
           <div className="pt-0 pb-0 px-6">
             <UploadFile />
+          </div>
+        );
+      case 'feedback': // Add this case
+        return (
+          <div className="pt-0 pb-0 px-6">
+            <ViewFeedback />
           </div>
         );
       case 'dbLogs':

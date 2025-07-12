@@ -51,7 +51,7 @@ import tempfile
 import whisper
 import openai
 from datetime import datetime, timedelta
-import base64
+import uuid
 
 # === REDIS ===
 import redis
@@ -88,6 +88,7 @@ DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 DB_NAME = os.getenv("DB_NAME")
+
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 EMAIL_SENDER_USER = os.getenv("EMAIL_SENDER_USER")
@@ -206,6 +207,7 @@ Below is the raw user message, between <user></user> tags. Only process what's i
 class UserMessage(BaseModel):
     message: str
     model: str = "llama3.2:latest"  # default model
+    conversation_id: Optional[str] = None
 
 def get_llm(model_name: str):
     if model_name == "llama3.2:1b":
@@ -214,6 +216,7 @@ def get_llm(model_name: str):
         return Ollama(model="llama3.2:latest", request_timeout=120.0, context_window=4096, base_url=remote_base_url)
     elif model_name == "llama3.3":
         return Ollama(model="llama3.3", request_timeout=120.0, context_window=4096, base_url=remote_base_url)
+
 
 # Call LLM and parse output
 def extract_questions(user_input: str) -> list[str]:
@@ -235,6 +238,21 @@ def extract_questions(user_input: str) -> list[str]:
             question_list.append(f"{label.strip()}: {question.strip()}")
     print(f"[LLM] Extracted questions: {question_list}")
     return question_list
+
+# generate autoname chat title
+def generate_chat_title(user_prompt: str, model_name: str = "llama3.2:1b") -> str:
+    prompt = (
+        "Summarize the following user message into a short, clear chat title (max 5 words) for the following user message. "
+        "Avoid generic words like 'Chat', 'Conversation', or 'Message'. Use title case, not all caps. Avoid generic titles. "
+        "Do not include any extra words, headers, punctuation, or quotation marks. "
+        "Output only the title itself.\n\n"
+        f"{user_prompt}"
+    )
+    llm_model = get_llm(model_name)
+    response = llm_model.complete(prompt)
+    title = response.text.strip().strip('"\'').splitlines()[0]
+    # Convert to title case
+    return title.title()
 
 
 @app.post("/process")
@@ -298,13 +316,32 @@ async def process_message(
             try:
                 conn = get_db()
                 with conn.cursor() as cursor:
-                    sql = """
-                        INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
-                        VALUES (%s, %s, %s, %s)
-                    """
+                    # sql = """
+                    #     INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
+                    #     VALUES (%s, %s, %s, %s)
+                    # """
+                    # user_id = current_user["user_id"]
+                    # # conversation_id = str(user_id)
+                    # conversation_id = data.conversation_id or str(uuid.uuid4())
+                    # cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
                     user_id = current_user["user_id"]
-                    conversation_id = str(user_id)
-                    cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
+                    conversation_id = data.conversation_id or str(uuid.uuid4())
+
+                    # Check if this is the first message in the conversation
+                    cursor.execute("SELECT COUNT(*) as count FROM chatbot_logs WHERE conversation_id = %s", (conversation_id,))
+                    row = cursor.fetchone()
+                    is_first_message = row["count"] == 0
+
+                    chat_title = None
+                    if is_first_message:
+                        chat_title = generate_chat_title(user_prompt)
+                    else:
+                        chat_title = None
+                    sql = """
+                        INSERT INTO chatbot_logs (user_id, conversation_id, query, response, title)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """
+                    cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response, chat_title))    
                 conn.commit()
             finally:
                 conn.close()
@@ -316,6 +353,7 @@ async def process_message(
         def questions_stream():
             yield json.dumps({"questions": questions})
         return StreamingResponse(questions_stream(), media_type="application/json")
+
     
 def send_email(to_email: str, subject: str, body: str, is_html: bool = False, sender: str = GMAIL_USER):
     """Send email using Gmail SMTP"""
@@ -352,6 +390,11 @@ async def stream_answer(
     data: UserMessage,
     current_user: dict = Depends(get_current_user)
 ):
+    
+    conversation_id = data.conversation_id
+    if not conversation_id:
+        print("[WARNING] No conversation_id provided. Cannot log chat properly.")
+
     # Set up the LLM based on user role
     role = current_user.get("role")
     country = current_user.get("country")
@@ -380,6 +423,7 @@ async def stream_answer(
     response_synthesizer = get_response_synthesizer(response_mode="tree_summarize", llm=llm_model, streaming=True)
     query_engine = RetrieverQueryEngine(retriever=retriever, response_synthesizer=response_synthesizer)
     user_prompt = data.message
+    #conversation_id = data.conversation_id or str(uuid.uuid4())
 
     print(f"[STREAM] Querying with: {data.message}")
     response = query_engine.query(f"{user_prompt}")
@@ -612,13 +656,35 @@ async def stream_answer(
         try:
             conn = get_db()
             with conn.cursor() as cursor:
+                # sql = """
+                #     INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
+                #     VALUES (%s, %s, %s, %s)
+                # """
+                # user_id = current_user["user_id"]
+                # # conversation_id = str(user_id)
+                # # conversation_id = data.conversation_id or str(uuid.uuid4())
+                # cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
+                user_id = current_user["user_id"]
+                conversation_id = data.conversation_id or str(uuid.uuid4())
+
+                # Check if this is the first message in the conversation
+                cursor.execute("SELECT COUNT(*) as count FROM chatbot_logs WHERE conversation_id = %s", (conversation_id,))
+                row = cursor.fetchone()
+                is_first_message = row["count"] == 0
+
+                chat_title = None
+                if is_first_message:
+                    chat_title = generate_chat_title(user_prompt)
+                else:
+                    chat_title = None
+
                 sql = """
-                    INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO chatbot_logs (user_id, conversation_id, query, response, title)
+                    VALUES (%s, %s, %s, %s, %s)
                 """
                 user_id = current_user["user_id"]
                 conversation_id = str(user_id)
-                cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
+                cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response, chat_title)) 
             conn.commit()
         finally:
             conn.close()
@@ -1048,7 +1114,7 @@ def read_profile(token: str = Depends(oauth2_scheme)):
 class ChatLog(BaseModel):
     query: str
     response: str
-
+    conversation_id: Optional[str] = None
 
 @app.post("/log_conversation/")
 async def log_conversation(
@@ -1058,20 +1124,30 @@ async def log_conversation(
     try:
         conn = get_db()
         with conn.cursor() as cursor:
+            # Check if this is the first message in the conversation
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM chatbot_logs WHERE user_id = %s AND conversation_id = %s
+            """, (current_user["user_id"], log.conversation_id))
+            count_row = cursor.fetchone()
+            is_first_message = (count_row["count"] == 0)
+
+            chat_title = None
+            if is_first_message and log.query:
+                # Generate chat title using LLM
+                chat_title = generate_chat_title(log.query)
+                
             sql = """
-                INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO chatbot_logs (user_id, conversation_id, query, response{title_col})
+                VALUES (%s, %s, %s, %s{title_val})
             """
+            if chat_title:
+                sql = sql.format(title_col=", title", title_val=", %s")
+                params = (current_user["user_id"], log.conversation_id or str(uuid.uuid4()), log.query, log.response, chat_title)
+            else:
+                sql = sql.format(title_col="", title_val="")
+                params = (current_user["user_id"], log.conversation_id or str(uuid.uuid4()), log.query, log.response)
 
-            user_id = current_user["user_id"]
-            conversation_id = str(user_id)
-
-            cursor.execute(sql, (
-                user_id,
-                conversation_id,
-                log.query,
-                log.response
-            ))
+            cursor.execute(sql, params)
         conn.commit()
         return {"message": "Conversation logged successfully."}
     except Exception as e:
@@ -1474,60 +1550,77 @@ async def transcribe(file: UploadFile = File(...)):
 
 # for chat search functionality
 @app.get("/search")
-def search_chats(q: str = ""):
-    connection = get_db()
+async def search_chats(q: str = "", current_user: dict = Depends(get_current_user)):
+    """
+    Search chats by query, return grouped by unique conversation_id.
+    Each result includes: conversation_id, preview (latest non-empty response), created_at (timestamp of that response).
+    """
+    conn = get_db()
     try:
-        with connection.cursor(pymysql.cursors.DictCursor) as cursor:  # <-- Use DictCursor here
-            if q.strip() == "":
-                # Return chats created in the last 30 days
-                thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
-                sql = """
-                    SELECT log_id, query, response, created_at
+        with conn.cursor() as cursor:
+            if not q.strip():
+                # Recent chats (last 30 days)
+                cursor.execute("""
+                    SELECT conversation_id, MAX(created_at) as latest_time
                     FROM chatbot_logs
-                    WHERE created_at >= %s
-                    ORDER BY created_at DESC
-                """
-                cursor.execute(sql, (thirty_days_ago,))
-            else:
-                # Split search query into words (and ignore very short/common words)
-                words = [word.lower() for word in q.strip().split() if len(word) >= 1]
-                if not words:
-                    return []
-
-                # Build dynamic WHERE clause: all words must be present
-                like_clauses = " AND ".join([
-                    "(LOWER(query) LIKE %s OR LOWER(response) LIKE %s)"
-                    for _ in words
-                ])
-                sql = f"""
-                    SELECT log_id, query, response, created_at
-                    FROM chatbot_logs
-                    WHERE {like_clauses}
-                    ORDER BY created_at DESC
-                    LIMIT 20
-                """
-                params = []
-                for word in words:
-                    wildcard = f"%{word}%"
-                    params.extend([wildcard, wildcard])  # one for query, one for response
-
-                cursor.execute(sql, params)
+                    WHERE user_id = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                    GROUP BY conversation_id
+                    ORDER BY latest_time DESC
+                    LIMIT 30
+                """, (current_user["user_id"],))
+                rows = cursor.fetchall()
+                results = []
+                for row in rows:
+                    # Get latest non-empty response as preview
+                    cursor.execute("""
+                        SELECT response, created_at, title FROM chatbot_logs
+                        WHERE user_id = %s AND conversation_id = %s AND response IS NOT NULL AND response != ''
+                        ORDER BY created_at DESC LIMIT 1
+                    """, (current_user["user_id"], row["conversation_id"]))
+                    preview_row = cursor.fetchone()
+                    preview = preview_row["response"] if preview_row else ""
+                    created_at = preview_row["created_at"] if preview_row else row["latest_time"]
+                    title = preview_row["title"] if preview_row else ""
+                    results.append({
+                        "conversation_id": str(row["conversation_id"]),
+                        "preview": preview,
+                        "created_at": created_at,
+                        "title": title
+                    })
+                return results
+            # If query, search logs and group by conversation_id
+            cursor.execute("""
+                SELECT conversation_id, MAX(created_at) as latest_time
+                FROM chatbot_logs
+                WHERE user_id = %s AND (query LIKE %s OR response LIKE %s)
+                GROUP BY conversation_id
+                ORDER BY latest_time DESC
+                LIMIT 30
+            """, (current_user["user_id"], f"%{q}%", f"%{q}%"))
 
             rows = cursor.fetchall()
-
-            results = [
-                {
-                    "log_id": row["log_id"],
-                    "query": row["query"],
-                    "response": row["response"],
-                    "created_at": row["created_at"].isoformat() if row["created_at"] else None
-                }
-                for row in rows
-            ]
+            results = []
+            for row in rows:
+                # Get latest matching non-empty response as preview
+                cursor.execute("""
+                    SELECT response, created_at, title FROM chatbot_logs
+                    WHERE user_id = %s AND conversation_id = %s AND response LIKE %s AND response IS NOT NULL AND response != ''
+                    ORDER BY created_at DESC LIMIT 1
+                """, (current_user["user_id"], row["conversation_id"], f"%{q}%"))
+                preview_row = cursor.fetchone()
+                preview = preview_row["response"] if preview_row else ""
+                created_at = preview_row["created_at"] if preview_row else row["latest_time"]
+                title = preview_row["title"] if preview_row and preview_row["title"] else ""
+                results.append({
+                    "conversation_id": str(row["conversation_id"]),
+                    "preview": preview,
+                    "created_at": created_at,
+                    "title": title
+                })
 
             return results
     finally:
-        connection.close()
+        conn.close()
 
 # for chat search functionality
 @app.get("/chat-log/{log_id}")
@@ -2252,4 +2345,174 @@ async def reset_password(request: PasswordResetConfirm, req: Request):
     finally:
         conn.close()
 
+class ChatTitle(BaseModel):
+    conversation_id: str
+    title: str
+    created_at: datetime
 
+class ChatLog(BaseModel):
+    conversation_id: str
+    content: str
+    role: str
+    created_at: datetime
+
+@app.get("/chat-history/titles", response_model=List[ChatTitle])
+async def get_chat_titles(current_user: dict = Depends(get_current_user)):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT conversation_id, MAX(created_at) as latest_time
+                FROM chatbot_logs
+                WHERE user_id = %s
+                GROUP BY conversation_id
+                ORDER BY latest_time DESC
+            """, (current_user["user_id"],))
+            rows = cursor.fetchall()
+            titles = []
+            for row in rows:
+                # Get the title from the first message in the conversation
+                cursor.execute("""
+                    SELECT title FROM chatbot_logs
+                    WHERE user_id = %s AND conversation_id = %s AND title IS NOT NULL
+                    ORDER BY created_at ASC LIMIT 1
+                """, (current_user["user_id"], row["conversation_id"]))
+                title_row = cursor.fetchone()
+                chat_title = title_row["title"] if title_row and title_row["title"] else f"Conversation {row['conversation_id']}"
+                titles.append({
+                    "conversation_id": str(row["conversation_id"]),
+                    "title": chat_title,
+                    "created_at": row["latest_time"]
+                })
+            return titles
+    finally:
+        conn.close()
+
+@app.get("/chat-history/{conversation_id}", response_model=List[ChatLog])
+async def get_chat_history(conversation_id: str, current_user: dict = Depends(get_current_user)):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT conversation_id, query, response, created_at
+                FROM chatbot_logs
+                WHERE user_id = %s AND conversation_id = %s
+                ORDER BY created_at ASC
+            """, (current_user["user_id"], conversation_id))
+            rows = cursor.fetchall()
+            if not rows:
+                raise HTTPException(status_code=404, detail="Chat history not found")
+            messages = []
+            for row in rows:
+                if row['query']:
+                    messages.append({
+                        "conversation_id": row['conversation_id'],
+                        "content": row['query'],
+                        "role": "user",
+                        "created_at": row['created_at']
+                    })
+                if row['response']:
+                    messages.append({
+                        "conversation_id": row['conversation_id'],
+                        "content": row['response'],
+                        "role": "assistant", 
+                        "created_at": row['created_at']
+                    })
+            return messages
+    finally:
+        conn.close()
+
+class FeedbackCreate(BaseModel):
+    category: str
+    message: str
+    rating: Optional[int] = None
+
+@app.post("/feedback")
+async def create_feedback(feedback: FeedbackCreate, current_user: dict = Depends(get_current_user)):
+    try:
+        connection = get_db()
+        cursor = connection.cursor()
+        
+        # Include user_id from the authenticated user
+        query = "INSERT INTO feedback (category, message, rating, user_id, created_at) VALUES (%s, %s, %s, %s, NOW())"
+        cursor.execute(query, (feedback.category, feedback.message, feedback.rating, current_user["user_id"]))
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        return {"message": "Feedback submitted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class FeedbackStatusUpdate(BaseModel):
+    status: str
+
+class FeedbackResponse(BaseModel):
+    id: int
+    message: str
+    category: str
+    rating: Optional[int]
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+@app.get("/api/feedback", response_model=List[FeedbackResponse])
+async def get_feedback(current_user: dict = Depends(get_current_user)):
+    try:
+        connection = get_db()
+        cursor = connection.cursor()
+
+        # Fetch all feedback from database
+        query = """
+        SELECT id, message, category, rating, status, created_at, updated_at 
+        FROM feedback 
+        ORDER BY created_at DESC
+        """
+        cursor.execute(query)
+        feedbacks = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
+
+        return feedbacks
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching feedback: {str(e)}")
+
+@app.put("/api/feedback/{feedback_id}/status")
+async def update_feedback_status(
+    feedback_id: int, 
+    status_update: FeedbackStatusUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+
+        # Validate status
+        valid_statuses = ["pending", "reviewed", "resolved"]
+        if status_update.status not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+
+        connection = get_db()
+        cursor = connection.cursor()
+
+        # Check if feedback exists
+        check_query = "SELECT id FROM feedback WHERE id = %s"
+        cursor.execute(check_query, (feedback_id,))
+        if not cursor.fetchone():
+            cursor.close()
+            connection.close()
+            raise HTTPException(status_code=404, detail="Feedback not found")
+
+        # Update feedback status
+        update_query = "UPDATE feedback SET status = %s, updated_at = NOW() WHERE id = %s"
+        cursor.execute(update_query, (status_update.status, feedback_id))
+        connection.commit()
+        cursor.close()
+        connection.close()
+
+        return {"message": "Feedback status updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating feedback status: {str(e)}")

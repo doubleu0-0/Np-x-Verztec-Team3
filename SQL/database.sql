@@ -17,6 +17,7 @@ CREATE TABLE chatbot_logs (
   log_id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NULL,
   conversation_id VARCHAR(50),
+  title VARCHAR(128) DEFAULT NULL,
   query TEXT,
   response TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -140,3 +141,13 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
     expires_at DATETIME NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- FEEDBACK TABLE
+CREATE TABLE feedback (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category ENUM('general', 'bug', 'feature') NOT NULL,
+    message TEXT NOT NULL,
+    rating INT DEFAULT NULL, -- nullable since bug/feature requests don't have ratings
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('pending', 'reviewed', 'resolved') DEFAULT 'pending');
