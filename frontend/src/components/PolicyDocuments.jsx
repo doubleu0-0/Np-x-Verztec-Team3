@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { ChevronUp, ChevronDown, MoreVertical, X, Filter, Loader } from 'lucide-react';
+import { ChevronUp, ChevronDown, MoreVertical, X, Filter, Loader, Search, RefreshCw } from 'lucide-react';
 
 const ALL_DEPARTMENTS = [
   "Marketing","Procurement","IT","Project Management","Human Resource","Admin & Operations","Business Development","Finance","Service Delivery"
@@ -200,6 +200,9 @@ export default function PolicyDocuments({ currentUser }) {
   const [saving, setSaving] = useState(false);
   const [deleteFile, setDeleteFile] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const scrollRef = useRef();
+  const dragRef = useRef(false);
+  const [expandedRow, setExpandedRow] = useState(null);
 
   useEffect(() => {
     fetchFileList();
@@ -358,29 +361,88 @@ export default function PolicyDocuments({ currentUser }) {
     }
   };
 
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+    let moved = false;
+
+    const mouseDownHandler = (e) => {
+      isDown = true;
+      moved = false;
+      el.classList.add("cursor-grabbing");
+      startX = e.pageX - el.offsetLeft;
+      scrollLeft = el.scrollLeft;
+    };
+    const mouseLeaveHandler = () => {
+      isDown = false;
+      el.classList.remove("cursor-grabbing");
+    };
+    const mouseUpHandler = () => {
+      isDown = false;
+      el.classList.remove("cursor-grabbing");
+      dragRef.current = moved;
+      setTimeout(() => { dragRef.current = false; }, 0);
+    };
+    const mouseMoveHandler = (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - el.offsetLeft;
+      const walk = (x - startX) * 1.5;
+      if (Math.abs(x - startX) > 5) moved = true;
+      el.scrollLeft = scrollLeft - walk;
+    };
+
+    el.addEventListener("mousedown", mouseDownHandler);
+    el.addEventListener("mouseleave", mouseLeaveHandler);
+    el.addEventListener("mouseup", mouseUpHandler);
+    el.addEventListener("mousemove", mouseMoveHandler);
+
+    return () => {
+      el.removeEventListener("mousedown", mouseDownHandler);
+      el.removeEventListener("mouseleave", mouseLeaveHandler);
+      el.removeEventListener("mouseup", mouseUpHandler);
+      el.removeEventListener("mousemove", mouseMoveHandler);
+    };
+  }, []);
+
   return (
     <div className="pt-1 pb-2">
       <div className="mb-2">
-        <div className="flex gap-4 mb-1 items-center">
-          <input
-            type="text"
-            placeholder="Search by file name, department, country, or uploader..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-3 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white"
-          />
-          <div>
-            <select
-              value={docsPerPage}
-              onChange={e => setDocsPerPage(Number(e.target.value))}
-              className="pl-3 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-base font-medium h-[44px]"
-              style={{ minWidth: 120 }}
-            >
-              {[5, 10, 20, 50, 100].map(n => (
-                <option key={n} value={n}>{n} per page</option>
-              ))}
-            </select>
+        <div className="flex gap-4 mb-2 items-center">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Search by file name, department, country, or uploader..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white"
+            />
+            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+              <Search className="w-4 h-4" />
+            </span>
           </div>
+          <button
+            onClick={fetchFileList}
+            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-yellow-100 dark:hover:bg-yellow-800 transition"
+            title="Refresh documents"
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+          <select
+            value={docsPerPage}
+            onChange={e => setDocsPerPage(Number(e.target.value))}
+            className="pl-3 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-base font-medium h-[44px]"
+            style={{ minWidth: 120 }}
+          >
+            {[5, 10, 20, 50, 100].map(n => (
+              <option key={n} value={n}>{n} per page</option>
+            ))}
+          </select>
           <button
             type="button"
             className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center justify-center h-[44px]"
@@ -397,122 +459,140 @@ export default function PolicyDocuments({ currentUser }) {
         Showing {paginatedFiles.length} of {filteredFiles.length} documents
       </div>
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th
-                className="px-6 py-3 w-72 max-w-xs text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                onClick={() => handleSort('file_name')}
-              >
-                <div className="flex items-center gap-1">
-                  File Name
-                  {getSortIcon('file_name')}
-                </div>
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                onClick={() => handleSort('departments')}
-              >
-                <div className="flex items-center gap-1">
-                  Departments
-                  {getSortIcon('departments')}
-                </div>
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                onClick={() => handleSort('countries')}
-              >
-                <div className="flex items-center gap-1">
-                  Countries
-                  {getSortIcon('countries')}
-                </div>
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                onClick={() => handleSort('uploaded_by')}
-              >
-                <div className="flex items-center gap-1">
-                  Uploader
-                  {getSortIcon('uploaded_by')}
-                </div>
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                onClick={() => handleSort('upload_time')}
-              >
-                <div className="flex items-center gap-1">
-                  Created
-                  {getSortIcon('upload_time')}
-                </div>
-              </th>
-              <th className="w-10 px-1 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {loading ? (
+        <div
+          ref={scrollRef}
+          className="overflow-x-auto rounded-lg cursor-grab"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader className="animate-spin w-6 h-6 text-yellow-500" />
-                    Loading files...
-                  </span>
-                </td>
+                <th
+                  className="px-6 py-3 w-72 max-w-xs text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  onClick={() => handleSort('file_name')}
+                >
+                  <div className="flex items-center gap-1">
+                    File Name
+                    {getSortIcon('file_name')}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  onClick={() => handleSort('departments')}
+                >
+                  <div className="flex items-center gap-1">
+                    Departments
+                    {getSortIcon('departments')}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  onClick={() => handleSort('countries')}
+                >
+                  <div className="flex items-center gap-1">
+                    Countries
+                    {getSortIcon('countries')}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  onClick={() => handleSort('uploaded_by')}
+                >
+                  <div className="flex items-center gap-1">
+                    Uploader
+                    {getSortIcon('uploaded_by')}
+                  </div>
+                </th>
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  onClick={() => handleSort('upload_time')}
+                >
+                  <div className="flex items-center gap-1">
+                    Created
+                    {getSortIcon('upload_time')}
+                  </div>
+                </th>
+                <th className="w-10 px-1 py-3"></th>
               </tr>
-            ) : paginatedFiles.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">No files found.</td>
-              </tr>
-            ) : (
-              paginatedFiles.map((file, idx) => {
-                const departments = typeof file.departments === "string" ? file.departments.split(",") : file.departments;
-                const countries = typeof file.countries === "string" ? file.countries.split(",") : file.countries;
-                return (
-                  <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700 relative">
-                    <td className="px-6 py-4 w-72 max-w-xs whitespace-nowrap overflow-hidden text-ellipsis text-gray-900 dark:text-white" title={file.file_name}>
-                      {file.file_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
-                      {isAll(departments, ALL_DEPARTMENTS) ? "ALL" : departments.join(", ")}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
-                      {isAll(countries, ALL_COUNTRIES) ? "ALL" : countries.join(", ")}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
-                      {file.uploaded_by}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
-                      {file.upload_time ? new Date(file.upload_time).toLocaleDateString() : "N/A"}
-                    </td>
-                    <td className="w-10 px-1 py-4 relative">
-                      <button
-                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                        onClick={() => handleMenuOpen(file.file_id)}
+            </thead>
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader className="animate-spin w-6 h-6 text-yellow-500" />
+                      Loading files...
+                    </span>
+                  </td>
+                </tr>
+              ) : paginatedFiles.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400">No files found.</td>
+                </tr>
+              ) : (
+                paginatedFiles.map((file, idx) => {
+                  const departments = typeof file.departments === "string" ? file.departments.split(",") : file.departments;
+                  const countries = typeof file.countries === "string" ? file.countries.split(",") : file.countries;
+                  const isExpanded = expandedRow === idx;
+                  return (
+                    <tr
+                      key={idx}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                      onClick={() => {
+                        if (dragRef.current) return;
+                        setExpandedRow(isExpanded ? null : idx);
+                      }}
+                    >
+                      <td className={isExpanded
+                        ? "px-6 py-4 w-72 whitespace-pre-line text-gray-900 dark:text-white align-top"
+                        : "px-6 py-4 w-72 max-w-xs whitespace-nowrap overflow-hidden text-ellipsis text-gray-900 dark:text-white"}
+                        title={!isExpanded ? file.file_name : undefined}
                       >
-                        <MoreVertical className="w-5 h-5" />
-                      </button>
-                      {menuOpen === file.file_id && (
-                        <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-20">
-                          <button
-                            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-xl"
-                            onClick={() => handleEdit(file)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-xl"
-                            onClick={() => setDeleteFile(file)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                        {file.file_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
+                        {isAll(departments, ALL_DEPARTMENTS) ? "ALL" : departments.join(", ")}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
+                        {isAll(countries, ALL_COUNTRIES) ? "ALL" : countries.join(", ")}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
+                        {file.uploaded_by}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
+                        {file.upload_time ? new Date(file.upload_time).toLocaleDateString() : "N/A"}
+                      </td>
+                      <td className="w-10 px-1 py-4 relative">
+                        <button
+                          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                          onClick={() => handleMenuOpen(file.file_id)}
+                        >
+                          <MoreVertical className="w-5 h-5" />
+                        </button>
+                        {menuOpen === file.file_id && (
+                          <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-20">
+                            <button
+                              className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-xl"
+                              onClick={() => handleEdit(file)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-xl"
+                              onClick={() => setDeleteFile(file)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
         {/* Pagination controls inside the border */}
         <div className="flex justify-end items-center gap-1 px-2 py-0 pb-2 text-xs">
           <button

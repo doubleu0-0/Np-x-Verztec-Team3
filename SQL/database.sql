@@ -39,12 +39,18 @@ CREATE TABLE upload_user_logs (
 );
 
 -- UPLOAD FILE LOGS
-CREATE TABLE upload_file_logs (
-  log_id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT,
-  username VARCHAR(255),
-  filename VARCHAR(255),
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE upload_file_logs ( 
+    file_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    file_name VARCHAR(255) NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    uploaded_by INT NOT NULL,
+    department TEXT NOT NULL,
+    access_level VARCHAR(50) NOT NULL,
+    file_path TEXT NOT NULL,
+    countries TEXT NOT NULL,
+    departments TEXT NOT NULL,
+    batch_id VARCHAR(50),
+    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- FILES

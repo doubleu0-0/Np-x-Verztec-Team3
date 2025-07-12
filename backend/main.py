@@ -482,15 +482,95 @@ async def stream_answer(
     response = chat_engine.stream_chat(data.message)
     '''
 
+    # Check the citations for non-empty source nodes
+
+    def simple_citation_evaluator_indices(query: str, response_text: str, source_nodes: List, llm_model) -> List[int]:
+        """
+        Simple approach: Ask LLM to pick the most relevant 2-3 documents and return their indices
+        """
+        if not source_nodes:
+            return []
+        
+        # Ensure response_text is a string and handle edge cases
+        if not isinstance(response_text, str):
+            response_text = str(response_text)
+        
+        # Prepare document summaries
+        docs_summary = []
+        for i, node_score in enumerate(source_nodes[:5]):
+            node = node_score.node
+            doc_name = node.metadata.get("source") or f"Document_{i+1}"
+            snippet = node.text[:500]  # Shorter snippet
+            docs_summary.append(f"{i+1}. {doc_name}: {snippet}")
+        
+        prompt = f"""
+            Given this user query and AI response, which documents are most relevant?
+
+            Query: {query}
+            Response: {response_text[:1000]}...
+
+            Available documents:
+            {chr(10).join(docs_summary)}
+
+            Select the most relevant document numbers (e.g., "1,3,5"). 
+            If you think none are relevant, respond with "none".
+            Be specific and strictly choose the documents, best number is 1 citation only.
+            Only respond with the numbers, comma-separated.
+            """
+
+        try:
+            llm_response = llm_model.complete(prompt)
+            text = llm_response.text.strip().lower()
+            if "none" in text:
+                return []
+
+            selected_nums = [int(x.strip()) for x in text.split(",") if x.strip().isdigit()]
+            selected_nums = [num for num in selected_nums if 1 <= num <= len(source_nodes)]
+
+            return selected_nums
+
+        except Exception as e:
+            print(f"[Simple Citation Index Filter] Error: {e}")
+            return list(range(1, min(4, len(source_nodes) + 1)))
+        
     def stream_generator():
         buffer = io.StringIO()
+        response_text = ""
         try:
             for token in response.response_gen:
                 if token is not None:
                     buffer.write(token)
+                    response_text += token
                     yield token
         except Exception as e:
             yield f"\n\n[ERROR streaming response: {e}]"
+
+        # Add animated loading indicator
+        yield "\n\nEvaluating citations"
+        
+        # Simple citation evaluation with progress dots
+        try:
+            print("[Citation Evaluation] Evaluating citations...")
+            
+            # Show progress animation
+            for i in range(3):
+                yield "."
+                # Small delay simulation - in real app you might want to split the evaluation
+            
+            selected_indices = simple_citation_evaluator_indices(
+                query=user_prompt,
+                response_text=str(response_text),
+                source_nodes=response.source_nodes,
+                llm_model=llm_model
+            )
+
+            yield "\n"  # Close the loading message
+            
+        except Exception as e:
+            print(f"[Citation Error] {e}")
+            selected_docs = []
+            yield "\n❌ Error evaluating citations\n"
+            return
 
         def get_real_file(filename):
             base = Path(filename).with_suffix('')
@@ -501,25 +581,24 @@ async def stream_answer(
                     return real_path.name
             return filename  # fallback
 
-        # Generate citations (Only show the unqiue files of the top 3 nodes)
-        top_nodes = response.source_nodes[:3]
-        cited_docs = {}
-        for node_score in top_nodes:
-            node = node_score.node
-            original = node.metadata.get("source") or node.metadata.get("title")
-            if not original:
-                continue
-            real_file = get_real_file(original)
-            if real_file not in cited_docs:
-                url = f"http://localhost:8000/download/{quote(real_file)}"
-                cited_docs[real_file] = url
+        seen_docs = []
+        # Show results
+        if selected_indices:
+            yield "\n**📄 Most Relevant Documents:**\n"
+            for idx in selected_indices:
+                node = response.source_nodes[idx - 1].node
+                doc_name = node.metadata.get("source") or node.metadata.get("title")
+                if doc_name and doc_name not in seen_docs:
+                    seen_docs.append(doc_name)
+                    # Get the real file path
+                    real_file = get_real_file(doc_name)
+                    url = f"http://localhost:8000/download/{quote(real_file)}"
+                    yield f"- [{real_file}]({url})\n"
+        else:
+            yield "**📄 No relevant documents found**\n"
 
-        # Yield citations section only if there are valid docs
-        if cited_docs:
-            yield "\n\n**📄 Cited Documents:**\n"
-            for name, url in cited_docs.items():
-                yield f"- [{name}]({url})\n"
 
+                
     # This wrapper allows us to perform logging after streaming is complete
     def streaming_with_logging():
         generator = stream_generator()
@@ -729,6 +808,131 @@ def delete_file(filename: str, current_user: dict = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+from fastapi import Query
+
+@app.get("/logs/{log_type}")
+async def get_logs(
+    log_type: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Only ADMIN can view logs
+    if current_user["role"] != "ADMIN":
+        raise HTTPException(status_code=403, detail="Not authorized to view logs")
+
+    # Map log_type to table name and columns
+    LOG_TABLES = {
+        "chatbot_logs": {
+            "table": "chatbot_logs",
+            "columns": ["log_id", "user", "conversation_id", "query", "response", "created_at"],
+            "sql": """
+                SELECT l.log_id, u.username AS user, l.conversation_id, l.query, l.response, l.created_at
+                FROM chatbot_logs l
+                LEFT JOIN users u ON l.user_id = u.user_id
+                ORDER BY l.log_id DESC
+            """
+        },
+        "login_logs": {
+            "table": "login_logs",
+            "columns": ["log_id", "user", "login_time", "status"],
+            "sql": """
+                SELECT l.log_id, u.username AS user, l.login_time, l.status
+                FROM login_logs l
+                LEFT JOIN users u ON l.user_id = u.user_id
+                ORDER BY l.log_id DESC
+            """
+        },
+        "upload_user_logs": {
+            "table": "upload_user_logs",
+            "columns": ["log_id", "user", "created_user", "timestamp"],
+            "sql": """
+                SELECT l.log_id, u1.username AS user, u2.username AS created_user, l.timestamp
+                FROM upload_user_logs l
+                LEFT JOIN users u1 ON l.user_id = u1.user_id
+                LEFT JOIN users u2 ON l.created_user_id = u2.user_id
+                ORDER BY l.log_id DESC
+            """
+        },
+        "upload_file_logs": {
+            "table": "upload_file_logs",
+            "columns": ["uploaded_by_username", "file_name", "department", "countries", "departments", "upload_time"],
+            "sql": """
+                SELECT u.username AS uploaded_by_username, f.file_name, f.department, f.countries, f.departments, f.upload_time
+                FROM upload_file_logs f
+                LEFT JOIN users u ON f.uploaded_by = u.user_id
+                ORDER BY f.upload_time DESC
+            """
+        },
+        "file_deletion_logs": {
+            "table": "file_deletion_logs",
+            "columns": ["log_id", "deleted_file_name", "department", "countries", "uploaded_by_username", "deleted_by_username", "deleted_at"],
+            "sql": """
+                SELECT log_id, deleted_file_name, department, countries, uploaded_by_username, deleted_by_username, deleted_at
+                FROM file_deletion_logs
+                ORDER BY log_id DESC
+            """
+        },
+        "user_update_logs": {
+            "table": "user_update_logs",
+            "columns": ["log_id", "target_username", "changed_by_username", "field_name", "old_value", "new_value", "changed_at"],
+            "sql": """
+                SELECT log_id, target_username, changed_by_username, field_name, old_value, new_value, changed_at
+                FROM user_update_logs
+                ORDER BY log_id DESC
+            """
+        },
+        "user_deletion_logs": {
+            "table": "user_deletion_logs",
+            "columns": ["log_id", "deleted_username", "deleted_email", "department", "role", "country", "deleted_by_username", "deleted_at"],
+            "sql": """
+                SELECT log_id, deleted_username, deleted_email, department, role, country, deleted_by_username, deleted_at
+                FROM user_deletion_logs
+                ORDER BY deleted_at DESC
+            """
+        },
+        "file_update_logs": {
+            "table": "file_update_logs",
+            "columns": ["log_id", "file_id", "file_name", "changed_by_username", "field_name", "old_value", "new_value", "changed_at"],
+            "sql": """
+                SELECT log_id, file_id, file_name, changed_by_username, field_name, old_value, new_value, changed_at
+                FROM file_update_logs
+                ORDER BY changed_at DESC
+            """
+        },
+        "password_reset_audit": {
+            "table": "password_reset_audit",
+            "columns": ["audit_id", "reset_type", "target_email", "target_username", "user_ip", "user_agent", "reset_token_used", "reset_at"],
+            "sql": """
+                SELECT audit_id, reset_type, target_email, target_username, user_ip, user_agent, reset_token_used, reset_at
+                FROM password_reset_audit
+                ORDER BY audit_id DESC
+            """
+        },
+        "password_reset_tokens": {
+            "table": "password_reset_tokens",
+            "columns": ["user", "token_hash", "expires_at", "created_at"],
+            "sql": """
+                SELECT u.username AS user, t.token_hash, t.expires_at, t.created_at
+                FROM password_reset_tokens t
+                LEFT JOIN users u ON t.user_id = u.user_id
+                ORDER BY t.created_at DESC
+            """
+        },
+    }
+
+    if log_type not in LOG_TABLES:
+        raise HTTPException(status_code=404, detail="Log type not found")
+
+    config = LOG_TABLES[log_type]
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(config["sql"])
+            rows = cursor.fetchall()
+            return {"columns": config["columns"], "rows": rows}
+    finally:
+        conn.close()
+
+
 def get_username_by_user_id(user_id, cursor):
     cursor.execute("SELECT username FROM users WHERE user_id = %s", (user_id,))
     user = cursor.fetchone()
@@ -782,7 +986,8 @@ def login_user(user: UserLogin, request: Request):
                 "username": user_record["username"],
                 "role": user_record["role"],
                 "department": user_record["department"],
-                "country": user_record["country"]
+                "country": user_record["country"],
+                "email": user_record["email"],
             }
 
             # Generate token
@@ -1357,6 +1562,94 @@ app.mount(
     name="static",
 )
 
+@app.put("/users/batch-update")
+async def batch_update_users(
+    request: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Batch update users. Only fields in 'data' will be updated for all user_ids.
+    Permission checks are enforced per user.
+    """
+    user_ids = request.get("user_ids", [])
+    data = request.get("data", {})
+
+    conn = get_db()
+    updated = []
+    failed = []
+    try:
+        with conn.cursor() as cursor:
+            for user_id in user_ids:
+                cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+                target = cursor.fetchone()
+                if not target:
+                    failed.append({"user_id": user_id, "reason": "User not found"})
+                    continue
+
+                # Permission checks (same as single update)
+                if current_user["role"] == "MANAGER":
+                    if target["role"] == "ADMIN":
+                        failed.append({"user_id": user_id, "reason": "Managers cannot edit admins"})
+                        continue
+                    if target["department"].strip().lower() != current_user["department"].strip().lower() or \
+                       target["country"].strip().lower() != current_user["country"].strip().lower():
+                        failed.append({"user_id": user_id, "reason": "Managers can only edit users in their own department and country"})
+                        continue
+                    if "role" in data and data["role"] == "ADMIN":
+                        failed.append({"user_id": user_id, "reason": "Managers cannot set role to ADMIN"})
+                        continue
+
+                allowed_fields = ["email", "department", "country", "role"]
+                updates = []
+                params = []
+                audit_logs = []
+                now = datetime.now()
+
+                for field in allowed_fields:
+                    if field in data and data[field] != target.get(field):
+                        updates.append(f"{field} = %s")
+                        params.append(data[field])
+                        audit_logs.append({
+                            "target_username": target["username"],
+                            "changed_by_username": current_user["username"],
+                            "field_name": field,
+                            "old_value": target.get(field),
+                            "new_value": data[field],
+                            "changed_at": now
+                        })
+
+                if not updates:
+                    failed.append({"user_id": user_id, "reason": "No valid fields to update"})
+                    continue
+
+                updates.append("updated_at = %s")
+                params.append(now)
+                params.append(user_id)
+                sql = f"UPDATE users SET {', '.join(updates)} WHERE user_id = %s"
+                cursor.execute(sql, params)
+
+                # Insert audit logs
+                for log in audit_logs:
+                    cursor.execute(
+                        """
+                        INSERT INTO user_update_logs (target_username, changed_by_username, field_name, old_value, new_value, changed_at)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            log["target_username"],
+                            log["changed_by_username"],
+                            log["field_name"],
+                            log["old_value"],
+                            log["new_value"],
+                            log["changed_at"]
+                        )
+                    )
+                updated.append(user_id)
+            conn.commit()
+        return {"updated": updated, "failed": failed}
+    finally:
+        conn.close()
+        
 @app.put("/users/{user_id}")
 async def update_user(
     user_id: int,
@@ -1416,9 +1709,11 @@ async def update_user(
             cursor.execute(sql, params)
 
             # Insert audit logs
+            # Insert audit logs
             for log in audit_logs:
                 cursor.execute(
                     """
+                    INSERT INTO user_update_logs (target_username, changed_by_username, field_name, old_value, new_value, changed_at)
                     VALUES (%s, %s, %s, %s, %s, %s)
                     """,
                     (
@@ -1430,7 +1725,6 @@ async def update_user(
                         log["changed_at"]
                     )
                 )
-
             conn.commit()
             return {"message": "User updated successfully"}
     finally:
@@ -1481,7 +1775,62 @@ async def delete_user(
     finally:
         conn.close()
 
+@app.post("/users/batch-delete")
+async def batch_delete_users(
+    user_ids: List[int] = Body(..., embed=True),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Batch delete users. Permission checks are enforced per user.
+    """
+    conn = get_db()
+    deleted = []
+    failed = []
+    try:
+        with conn.cursor() as cursor:
+            for user_id in user_ids:
+                cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+                target = cursor.fetchone()
+                if not target:
+                    failed.append({"user_id": user_id, "reason": "User not found"})
+                    continue
+                # Prevent users from deleting themselves
+                if user_id == current_user["user_id"]:
+                    failed.append({"user_id": user_id, "reason": "You cannot delete your own account."})
+                    continue
+                if current_user["role"] == "MANAGER":
+                    if target["role"] == "ADMIN":
+                        failed.append({"user_id": user_id, "reason": "Managers cannot delete admins"})
+                        continue
+                    if target["department"].strip().lower() != current_user["department"].strip().lower() or \
+                       target["country"].strip().lower() != current_user["country"].strip().lower():
+                        failed.append({"user_id": user_id, "reason": "Managers can only delete users in their own department and country"})
+                        continue
+                # Log deletion
+                cursor.execute(
+                    """
+                    INSERT INTO user_deletion_logs (
+                        deleted_username, deleted_email, department, role, country, deleted_by_username, deleted_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        target["username"],
+                        target["email"],
+                        target["department"],
+                        target["role"],
+                        target["country"],
+                        current_user["username"],
+                        datetime.now()
+                    )
+                )
+                cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+                deleted.append(user_id)
+            conn.commit()
+        return {"deleted": deleted, "failed": failed}
+    finally:
+        conn.close()
 
+        
 @app.put("/update-file/{filename}")
 async def update_file_metadata(
     filename: str,
