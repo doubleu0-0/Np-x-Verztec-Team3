@@ -51,12 +51,27 @@ import tempfile
 import whisper
 import openai
 from datetime import datetime, timedelta
+import base64
 
-# --- REDIS ---
+# === REDIS ===
 import redis
 from fastapi import Header, Security
 from typer import prompt
 
+# === Email Stuff ===
+import smtplib
+import email.mime.text
+import email.mime.multipart
+MIMEText = email.mime.text.MIMEText
+MIMEMultipart = email.mime.multipart.MIMEMultipart
+import secrets
+import hashlib
+import base64
+
+
+
+import uuid
+from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = PROJECT_ROOT / "pipeline" / "data" / "raw_data"
@@ -78,6 +93,11 @@ DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 DB_NAME = os.getenv("DB_NAME")
+
+GMAIL_USER = os.getenv("GMAIL_USER")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+EMAIL_SENDER_USER = os.getenv("EMAIL_SENDER_USER")
+EMAIL_SENDER_APP_PASSWORD = os.getenv("EMAIL_SENDER_APP_PASSWORD")
 
 
 # Connect to Redis
@@ -193,6 +213,7 @@ Below is the raw user message, between <user></user> tags. Only process what's i
 class UserMessage(BaseModel):
     message: str
     model: str = "llama3.2:latest"  # default model
+    conversation_id: Optional[str] = None
 
 def get_llm(model_name: str):
     if model_name == "llama3.2:1b":
@@ -222,6 +243,22 @@ def extract_questions(user_input: str) -> list[str]:
             question_list.append(f"{label.strip()}: {question.strip()}")
     print(f"[LLM] Extracted questions: {question_list}")
     return question_list
+
+# generate autoname chat title
+def generate_chat_title(user_prompt: str, model_name: str = "llama3.2:1b") -> str:
+    prompt = (
+        "Summarize the following user message into a short, clear chat title (max 5 words) for the following user message. "
+        "Avoid generic words like 'Chat', 'Conversation', or 'Message'. Use title case, not all caps. Avoid generic titles. "
+        "Do not include any extra words, headers, punctuation, or quotation marks. "
+        "Output only the title itself.\n\n"
+        f"{user_prompt}"
+    )
+    conversation_id = data.conversation_id or str(uuid.uuid4())  # Generate a new one if not passed
+    llm_model = get_llm(model_name)
+    response = llm_model.complete(prompt)
+    title = response.text.strip().strip('"\'').splitlines()[0]
+    # Convert to title case
+    return title.title()
 
 
 @app.post("/process")
@@ -285,13 +322,32 @@ async def process_message(
             try:
                 conn = get_db()
                 with conn.cursor() as cursor:
-                    sql = """
-                        INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
-                        VALUES (%s, %s, %s, %s)
-                    """
+                    # sql = """
+                    #     INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
+                    #     VALUES (%s, %s, %s, %s)
+                    # """
+                    # user_id = current_user["user_id"]
+                    # # conversation_id = str(user_id)
+                    # conversation_id = data.conversation_id or str(uuid.uuid4())
+                    # cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
                     user_id = current_user["user_id"]
-                    conversation_id = str(user_id)
-                    cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
+                    conversation_id = data.conversation_id or str(uuid.uuid4())
+
+                    # Check if this is the first message in the conversation
+                    cursor.execute("SELECT COUNT(*) as count FROM chatbot_logs WHERE conversation_id = %s", (conversation_id,))
+                    row = cursor.fetchone()
+                    is_first_message = row["count"] == 0
+
+                    chat_title = None
+                    if is_first_message:
+                        chat_title = generate_chat_title(user_prompt)
+                    else:
+                        chat_title = None
+                    sql = """
+                        INSERT INTO chatbot_logs (user_id, conversation_id, query, response, title)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """
+                    cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response, chat_title))    
                 conn.commit()
             finally:
                 conn.close()
@@ -304,16 +360,51 @@ async def process_message(
             yield json.dumps({"questions": questions})
         return StreamingResponse(questions_stream(), media_type="application/json")
 
+def send_email(to_email: str, subject: str, body: str, is_html: bool = False, sender: str = GMAIL_USER):
+    """Send email using Gmail SMTP"""
+    try:
+        # Create message
+        msg = MIMEMultipart("alternative")
+        msg["From"] = sender
+        msg["To"] = to_email
+        msg["Subject"] = subject
+
+        # Add body to email
+        if is_html:
+            msg.attach(MIMEText(body, "html"))
+        else:
+            msg.attach(MIMEText(body, "plain"))
+
+        # Gmail SMTP configuration
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()  # Enable security
+        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+
+        # Send email
+        text = msg.as_string()
+        server.sendmail(GMAIL_USER, to_email, text)
+        server.quit()
+
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
 
 @app.post("/stream")
 async def stream_answer(
     data: UserMessage,
     current_user: dict = Depends(get_current_user)
 ):
+
+    conversation_id = data.conversation_id
+    if not conversation_id:
+        print("[WARNING] No conversation_id provided. Cannot log chat properly.")
+
     # Set up the LLM based on user role
     role = current_user.get("role")
     country = current_user.get("country")
     department = current_user.get("department")
+    email = current_user.get("email")
 
     def normalize_key(key):
         return key.strip()
@@ -337,6 +428,8 @@ async def stream_answer(
     response_synthesizer = get_response_synthesizer(response_mode="tree_summarize", llm=llm_model, streaming=True)
     query_engine = RetrieverQueryEngine(retriever=retriever, response_synthesizer=response_synthesizer)
     user_prompt = data.message
+    # conversation_id = data.conversation_id or str(uuid.uuid4())
+
 
     print(f"[STREAM] Querying with: {data.message}")
     response = query_engine.query(f"{user_prompt}")
@@ -348,7 +441,12 @@ async def stream_answer(
             "no relevant information found",
             "no answer found",
             "no content",
-            "empty response"
+            "empty response",
+            "there is no",
+            "unfortunately",
+            "i am sorry",
+            "i do not",
+            r"I' couldn't",
         ]
         if resp is None:
             return True
@@ -383,15 +481,51 @@ async def stream_answer(
         print("Empty Response")
         llm_model = get_llm(model_name="llama3.2:latest")
         fallback_text = llm_model.complete(
-            f"You are Verztec's AI HR assistant. The user asked you about: {user_prompt}. "
-            "The information was not found in the index. "
-            "Respond ONLY in this exact format and do not add any extra information, tips, suggestions, or explanations:\n\n"
-            "I am sorry, but I do not have information on (info).\n"
-            "This might be due to a lack of permissions.\n"
-            f"As a {role}, you are allowed to access documents in {country}.\n"
-            f"User role: {role}, country: {country}. User question: {user_prompt}\n"
+            f"You are Verztec's AI HR assistant. The user asked: '{user_prompt}'. "
+            "You do not have information on this topic. "
+            "Reply ONLY with: 'I am sorry, but I do not have information on this topic.' "
+            "Then, state the user's role and country."
+            f" User role: {role}, User country: {country}, User department: {department}."
         )
         raw_text = fallback_text.text.strip()
+
+        # --- Log fallback to DB using same conversation ID ---
+        try:
+            conn = get_db()
+            with conn.cursor() as cursor:
+                sql = """
+                    INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
+                    VALUES (%s, %s, %s, %s)
+                """
+                user_id = current_user["user_id"]
+                cursor.execute(sql, (user_id, conversation_id, user_prompt, raw_text))
+            conn.commit()
+        finally:
+            conn.close()
+
+            # --- Send fallback email ---
+        try:
+            sender = EMAIL_SENDER_USER
+            recipient = GMAIL_USER
+            subject = "[AI HR Fallback] User Query Needs Attention"
+            user_email = current_user.get("email", "unknown")
+            department = current_user.get("department", "unknown")
+            msg_body = (
+                f"User info: role={role}, country={country}, department={department}, email={user_email}\n\n"
+                f"User query:\n{user_prompt}\n\n"
+                f"Chatbot response:\n{raw_text}\n"
+            )
+            send_email(
+                to_email=recipient,
+                subject=subject,
+                body=msg_body,
+                is_html=False,  # plain text for clarity
+                sender=sender
+            )
+
+        except Exception as e:
+            print(f"[Fallback Email] Failed to send fallback email: {e}")
+
         def fallback_stream():
             yield raw_text
         return StreamingResponse(fallback_stream(), media_type="text/plain")
@@ -463,13 +597,35 @@ async def stream_answer(
         try:
             conn = get_db()
             with conn.cursor() as cursor:
+                # sql = """
+                #     INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
+                #     VALUES (%s, %s, %s, %s)
+                # """
+                # user_id = current_user["user_id"]
+                # # conversation_id = str(user_id)
+                # # conversation_id = data.conversation_id or str(uuid.uuid4())
+                # cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
+                user_id = current_user["user_id"]
+                conversation_id = data.conversation_id or str(uuid.uuid4())
+
+                # Check if this is the first message in the conversation
+                cursor.execute("SELECT COUNT(*) as count FROM chatbot_logs WHERE conversation_id = %s", (conversation_id,))
+                row = cursor.fetchone()
+                is_first_message = row["count"] == 0
+
+                chat_title = None
+                if is_first_message:
+                    chat_title = generate_chat_title(user_prompt)
+                else:
+                    chat_title = None
+
                 sql = """
-                    INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO chatbot_logs (user_id, conversation_id, query, response, title)
+                    VALUES (%s, %s, %s, %s, %s)
                 """
                 user_id = current_user["user_id"]
                 conversation_id = str(user_id)
-                cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response))
+                cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response, chat_title)) 
             conn.commit()
         finally:
             conn.close()
@@ -773,6 +929,7 @@ def read_profile(token: str = Depends(oauth2_scheme)):
 class ChatLog(BaseModel):
     query: str
     response: str
+    conversation_id: Optional[str] = None  # ✅ add this if not already 
 
 
 @app.post("/log_conversation/")
@@ -783,20 +940,30 @@ async def log_conversation(
     try:
         conn = get_db()
         with conn.cursor() as cursor:
+            # Check if this is the first message in the conversation
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM chatbot_logs WHERE user_id = %s AND conversation_id = %s
+            """, (current_user["user_id"], log.conversation_id))
+            count_row = cursor.fetchone()
+            is_first_message = (count_row["count"] == 0)
+
+            chat_title = None
+            if is_first_message and log.query:
+                # Generate chat title using LLM
+                chat_title = generate_chat_title(log.query)
+                
             sql = """
-                INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO chatbot_logs (user_id, conversation_id, query, response{title_col})
+                VALUES (%s, %s, %s, %s{title_val})
             """
+            if chat_title:
+                sql = sql.format(title_col=", title", title_val=", %s")
+                params = (current_user["user_id"], log.conversation_id or str(uuid.uuid4()), log.query, log.response, chat_title)
+            else:
+                sql = sql.format(title_col="", title_val="")
+                params = (current_user["user_id"], log.conversation_id or str(uuid.uuid4()), log.query, log.response)
 
-            user_id = current_user["user_id"]
-            conversation_id = str(user_id)
-
-            cursor.execute(sql, (
-                user_id,
-                conversation_id,
-                log.query,
-                log.response
-            ))
+            cursor.execute(sql, params)
         conn.commit()
         return {"message": "Conversation logged successfully."}
     except Exception as e:
@@ -866,7 +1033,7 @@ async def upload_xlsx(
                         detail=f"Department must be {current_user['department']}"
                     )
 
-            if not isinstance(email, str) or not email.endswith("@gmail.com"):
+            if not isinstance(email, str) or not (email.endswith("@verztec.com") or email.endswith("@gmail.com")): # THE @GMAIL IS ONLY FOR TESTING THE EMAIL SENDING
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid or missing email"
@@ -1199,60 +1366,77 @@ async def transcribe(file: UploadFile = File(...)):
 
 # for chat search functionality
 @app.get("/search")
-def search_chats(q: str = ""):
-    connection = get_db()
+async def search_chats(q: str = "", current_user: dict = Depends(get_current_user)):
+    """
+    Search chats by query, return grouped by unique conversation_id.
+    Each result includes: conversation_id, preview (latest non-empty response), created_at (timestamp of that response).
+    """
+    conn = get_db()
     try:
-        with connection.cursor(pymysql.cursors.DictCursor) as cursor:  # <-- Use DictCursor here
-            if q.strip() == "":
-                # Return chats created in the last 30 days
-                thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
-                sql = """
-                    SELECT log_id, query, response, created_at
+        with conn.cursor() as cursor:
+            if not q.strip():
+                # Recent chats (last 30 days)
+                cursor.execute("""
+                    SELECT conversation_id, MAX(created_at) as latest_time
                     FROM chatbot_logs
-                    WHERE created_at >= %s
-                    ORDER BY created_at DESC
-                """
-                cursor.execute(sql, (thirty_days_ago,))
-            else:
-                # Split search query into words (and ignore very short/common words)
-                words = [word.lower() for word in q.strip().split() if len(word) >= 1]
-                if not words:
-                    return []
-
-                # Build dynamic WHERE clause: all words must be present
-                like_clauses = " AND ".join([
-                    "(LOWER(query) LIKE %s OR LOWER(response) LIKE %s)"
-                    for _ in words
-                ])
-                sql = f"""
-                    SELECT log_id, query, response, created_at
-                    FROM chatbot_logs
-                    WHERE {like_clauses}
-                    ORDER BY created_at DESC
-                    LIMIT 20
-                """
-                params = []
-                for word in words:
-                    wildcard = f"%{word}%"
-                    params.extend([wildcard, wildcard])  # one for query, one for response
-
-                cursor.execute(sql, params)
+                    WHERE user_id = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                    GROUP BY conversation_id
+                    ORDER BY latest_time DESC
+                    LIMIT 30
+                """, (current_user["user_id"],))
+                rows = cursor.fetchall()
+                results = []
+                for row in rows:
+                    # Get latest non-empty response as preview
+                    cursor.execute("""
+                        SELECT response, created_at, title FROM chatbot_logs
+                        WHERE user_id = %s AND conversation_id = %s AND response IS NOT NULL AND response != ''
+                        ORDER BY created_at DESC LIMIT 1
+                    """, (current_user["user_id"], row["conversation_id"]))
+                    preview_row = cursor.fetchone()
+                    preview = preview_row["response"] if preview_row else ""
+                    created_at = preview_row["created_at"] if preview_row else row["latest_time"]
+                    title = preview_row["title"] if preview_row else ""
+                    results.append({
+                        "conversation_id": str(row["conversation_id"]),
+                        "preview": preview,
+                        "created_at": created_at,
+                        "title": title
+                    })
+                return results
+            # If query, search logs and group by conversation_id
+            cursor.execute("""
+                SELECT conversation_id, MAX(created_at) as latest_time
+                FROM chatbot_logs
+                WHERE user_id = %s AND (query LIKE %s OR response LIKE %s)
+                GROUP BY conversation_id
+                ORDER BY latest_time DESC
+                LIMIT 30
+            """, (current_user["user_id"], f"%{q}%", f"%{q}%"))
 
             rows = cursor.fetchall()
-
-            results = [
-                {
-                    "log_id": row["log_id"],
-                    "query": row["query"],
-                    "response": row["response"],
-                    "created_at": row["created_at"].isoformat() if row["created_at"] else None
-                }
-                for row in rows
-            ]
+            results = []
+            for row in rows:
+                # Get latest matching non-empty response as preview
+                cursor.execute("""
+                    SELECT response, created_at, title FROM chatbot_logs
+                    WHERE user_id = %s AND conversation_id = %s AND response LIKE %s AND response IS NOT NULL AND response != ''
+                    ORDER BY created_at DESC LIMIT 1
+                """, (current_user["user_id"], row["conversation_id"], f"%{q}%"))
+                preview_row = cursor.fetchone()
+                preview = preview_row["response"] if preview_row else ""
+                created_at = preview_row["created_at"] if preview_row else row["latest_time"]
+                title = preview_row["title"] if preview_row and preview_row["title"] else ""
+                results.append({
+                    "conversation_id": str(row["conversation_id"]),
+                    "preview": preview,
+                    "created_at": created_at,
+                    "title": title
+                })
 
             return results
     finally:
-        connection.close()
+        conn.close()
 
 # for chat search functionality
 @app.get("/chat-log/{log_id}")
@@ -1522,9 +1706,12 @@ def update_docs_with_metadata(filename, file_metadata):
         "Korea", "China", "Japan", "Vietnam", "Myanmar"
     ]
 
-    # Use the provided lists
-    departments = file_metadata.get("departments", [])
-    countries = file_metadata.get("countries", [])
+    # Normalize the metadata format first
+    normalized_metadata = normalize_metadata_format(file_metadata)
+
+    # Use the normalized lists
+    departments = normalized_metadata.get("departments", [])
+    countries = normalized_metadata.get("countries", [])
 
     # Extract base filename without extension
     base_name = os.path.splitext(filename)[0]
@@ -1624,6 +1811,289 @@ def delete_docs_by_filename(filename):
             print(f"Deleted meta file: {meta_path}")
         except Exception as e:
             print(f"Error deleting meta file {meta_path}: {e}")
+
+def normalize_metadata_format(metadata):
+    """
+    Normalize metadata format to ensure departments and countries are arrays of strings.
+    Handles both old format (comma-separated strings) and new format (arrays).
+    """
+    if not isinstance(metadata, dict):
+        return metadata
+
+    normalized = metadata.copy()
+
+    # Fix departments
+    if "departments" in normalized:
+        deps = normalized["departments"]
+        if isinstance(deps, str):
+            # Single string - split by comma
+            normalized["departments"] = [dept.strip() for dept in deps.split(",") if dept.strip()]
+        elif isinstance(deps, list):
+            # List - check if it contains comma-separated strings
+            new_departments = []
+            for item in deps:
+                if isinstance(item, str) and "," in item:
+                    # Split comma-separated string
+                    new_departments.extend([dept.strip() for dept in item.split(",") if dept.strip()])
+                elif isinstance(item, str):
+                    new_departments.append(item.strip())
+            normalized["departments"] = new_departments
+
+    # Fix countries
+    if "countries" in normalized:
+        countries = normalized["countries"]
+        if isinstance(countries, str):
+            # Single string - split by comma
+            normalized["countries"] = [country.strip() for country in countries.split(",") if country.strip()]
+        elif isinstance(countries, list):
+            # List - check if it contains comma-separated strings
+            new_countries = []
+            for item in countries:
+                if isinstance(item, str) and "," in item:
+                    # Split comma-separated string
+                    new_countries.extend([country.strip() for country in item.split(",") if country.strip()])
+                elif isinstance(item, str):
+                    new_countries.append(item.strip())
+            normalized["countries"] = new_countries
+
+    return normalized
+
+
+# Password reset models
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    user_id: int
+    new_password: str
+
+
+@app.post("/forgot-password")
+async def forgot_password(request: PasswordResetRequest, req: Request):
+    """Send password reset link to user's email"""
+    try:
+        conn = get_db()
+        with conn.cursor() as cursor:
+            # Check if user exists
+            cursor.execute("SELECT user_id, username FROM users WHERE email = %s", (request.email,))
+            user = cursor.fetchone()
+
+            # Log the password reset request attempt (regardless of whether user exists)
+            user_ip = req.client.host
+            user_agent = req.headers.get("user-agent", "")
+
+            cursor.execute("""
+                INSERT INTO password_reset_audit (
+                    reset_type, target_email, target_username, user_ip, user_agent, reset_at
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                "REQUESTED",
+                request.email,
+                user["username"] if user else None,
+                user_ip,
+                user_agent,
+                datetime.now()
+            ))
+
+            if not user:
+                conn.commit()
+                # Don't reveal whether email exists or not for security
+                return {"message": "If the email exists, a password reset link has been sent."}
+
+            # Generate reset token
+            reset_token = secrets.token_urlsafe(32)
+            reset_token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
+
+            # Store reset token in database (expires in 1 hour)
+            expire_time = datetime.now() + timedelta(hours=1)
+            cursor.execute("""
+                INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE token_hash = %s, expires_at = %s
+            """, (user["user_id"], reset_token_hash, expire_time, reset_token_hash, expire_time))
+
+            conn.commit()
+
+            # Create reset link
+            reset_link = f"http://localhost:3000/reset-password?token={reset_token}&user_id={user['user_id']}"
+
+            # Email content
+            subject = "Password Reset Request - Verztec HR System"
+            body = f"""
+            <html>
+            <body>
+                <h2>Password Reset Request</h2>
+                <p>Hello {user['username']},</p>
+                <p>You have requested to reset your password for the Verztec HR System.</p>
+                <p>Click the link below to reset your password:</p>
+                <p><a href="{reset_link}" style="background-color: #EAB308; color: black; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a></p>
+                <p>This link will expire in 1 hour.</p>
+                <p>If you did not request this password reset, please ignore this email.</p>
+                <br>
+                <p>If you have any questions, please contact our IT support at <a href="mailto:it-support@verztec.com">it-support@verztec.com</a> or call +65 1234 5678.</p>
+                <br>
+                <p>Best regards,<br>Verztec HR System</p>
+            </body>
+            </html>
+            """
+
+            # Send email
+            email_sent = send_email(request.email, subject, body, is_html=True)
+
+            if email_sent:
+                return {"message": "If the email exists, a password reset link has been sent."}
+            else:
+                raise HTTPException(status_code=500, detail="Failed to send email")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in forgot_password: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        conn.close()
+
+@app.post("/reset-password")
+async def reset_password(request: PasswordResetConfirm, req: Request):
+    """Reset password using token"""
+    try:
+        conn = get_db()
+        with conn.cursor() as cursor:
+            # Verify token
+            token_hash = hashlib.sha256(request.token.encode()).hexdigest()
+            cursor.execute("""
+                SELECT user_id FROM password_reset_tokens 
+                WHERE user_id = %s AND token_hash = %s AND expires_at > %s
+            """, (request.user_id, token_hash, datetime.now()))
+
+            token_record = cursor.fetchone()
+            if not token_record:
+                raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+            # Get user details for audit log
+            cursor.execute("SELECT username, email FROM users WHERE user_id = %s", (request.user_id,))
+            user_details = cursor.fetchone()
+
+            # Hash new password
+            new_password_hash = hash_password(request.new_password)
+
+            # Update password
+            cursor.execute("""
+                UPDATE users SET password_hash = %s, updated_at = %s 
+                WHERE user_id = %s
+            """, (new_password_hash, datetime.now(), request.user_id))
+
+            # Log the successful password reset
+            user_ip = req.client.host
+            user_agent = req.headers.get("user-agent", "")
+
+            cursor.execute("""
+                INSERT INTO password_reset_audit (
+                    reset_type, target_email, target_username, user_ip, user_agent, 
+                    reset_token_used, reset_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                "COMPLETED",
+                user_details["email"] if user_details else None,
+                user_details["username"] if user_details else None,
+                user_ip,
+                user_agent,
+                token_hash[:16] + "...",  # Store partial token for audit (first 16 chars)
+                datetime.now()
+            ))
+
+            # Delete used token
+            cursor.execute("DELETE FROM password_reset_tokens WHERE user_id = %s", (request.user_id,))
+
+            conn.commit()
+
+            return {"message": "Password reset successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in reset_password: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        conn.close()
+
+class ChatTitle(BaseModel):
+    conversation_id: str
+    title: str
+    created_at: datetime
+
+class ChatLog(BaseModel):
+    conversation_id: str
+    content: str
+    role: str
+    created_at: datetime
+
+@app.get("/chat-history/titles", response_model=List[ChatTitle])
+async def get_chat_titles(current_user: dict = Depends(get_current_user)):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT conversation_id, MAX(created_at) as latest_time
+                FROM chatbot_logs
+                WHERE user_id = %s
+                GROUP BY conversation_id
+                ORDER BY latest_time DESC
+            """, (current_user["user_id"],))
+            rows = cursor.fetchall()
+            titles = []
+            for row in rows:
+                # Get the title from the first message in the conversation
+                cursor.execute("""
+                    SELECT title FROM chatbot_logs
+                    WHERE user_id = %s AND conversation_id = %s AND title IS NOT NULL
+                    ORDER BY created_at ASC LIMIT 1
+                """, (current_user["user_id"], row["conversation_id"]))
+                title_row = cursor.fetchone()
+                chat_title = title_row["title"] if title_row and title_row["title"] else f"Conversation {row['conversation_id']}"
+                titles.append({
+                    "conversation_id": str(row["conversation_id"]),
+                    "title": chat_title,
+                    "created_at": row["latest_time"]
+                })
+            return titles
+    finally:
+        conn.close()
+
+@app.get("/chat-history/{conversation_id}", response_model=List[ChatLog])
+async def get_chat_history(conversation_id: str, current_user: dict = Depends(get_current_user)):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT conversation_id, query, response, created_at
+                FROM chatbot_logs
+                WHERE user_id = %s AND conversation_id = %s
+                ORDER BY created_at ASC
+            """, (current_user["user_id"], conversation_id))
+            rows = cursor.fetchall()
+            if not rows:
+                raise HTTPException(status_code=404, detail="Chat history not found")
+            messages = []
+            for row in rows:
+                if row['query']:
+                    messages.append({
+                        "conversation_id": row['conversation_id'],
+                        "content": row['query'],
+                        "role": "user",
+                        "created_at": row['created_at']
+                    })
+                if row['response']:
+                    messages.append({
+                        "conversation_id": row['conversation_id'],
+                        "content": row['response'],
+                        "role": "assistant", 
+                        "created_at": row['created_at']
+                    })
+            return messages
+    finally:
+        conn.close()
             
 class FeedbackCreate(BaseModel):
     category: str
