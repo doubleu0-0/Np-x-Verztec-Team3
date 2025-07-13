@@ -145,9 +145,11 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 -- FEEDBACK TABLE
 CREATE TABLE feedback (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
     category ENUM('general', 'bug', 'feature') NOT NULL,
     message TEXT NOT NULL,
     rating INT DEFAULT NULL, -- nullable since bug/feature requests don't have ratings
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     status ENUM('pending', 'reviewed', 'resolved') DEFAULT 'pending');
+    

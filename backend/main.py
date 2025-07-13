@@ -260,6 +260,7 @@ async def process_message(
     data: UserMessage,
     current_user: dict = Depends(get_current_user)
 ):
+    conversation_id = data.conversation_id or str(uuid.uuid4())  # Generate a new one if not passed
     llm_model = get_llm(model_name=data.model)
     questions = extract_questions(data.message)
     user_prompt = data.message
@@ -328,7 +329,7 @@ async def process_message(
                     conversation_id = data.conversation_id or str(uuid.uuid4())
 
                     # Check if this is the first message in the conversation
-                    cursor.execute("SELECT COUNT(*) as count FROM chatbot_logs WHERE conversation_id = %s", (conversation_id,))
+                    cursor.execute("SELECT COUNT(*) as count FROM chatbot_logs WHERE user_id = %s AND conversation_id = %s", (user_id, conversation_id))
                     row = cursor.fetchone()
                     is_first_message = row["count"] == 0
 
@@ -483,6 +484,20 @@ async def stream_answer(
         )
         raw_text = fallback_text.text.strip()
 
+        # --- Log fallback to DB using same conversation ID ---
+        try:
+            conn = get_db()
+            with conn.cursor() as cursor:
+                sql = """
+                    INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
+                    VALUES (%s, %s, %s, %s)
+                """
+                user_id = current_user["user_id"]
+                cursor.execute(sql, (user_id, conversation_id, user_prompt, raw_text))
+            conn.commit()
+        finally:
+            conn.close()
+
             # --- Send fallback email ---
         try:
             sender = EMAIL_SENDER_USER
@@ -613,7 +628,7 @@ async def stream_answer(
         except Exception as e:
             print(f"[Citation Error] {e}")
             selected_docs = []
-            yield "\n❌ Error evaluating citations\n"
+            yield "\nError evaluating citations\n"
             return
 
         def get_real_file(filename):
@@ -668,7 +683,7 @@ async def stream_answer(
                 conversation_id = data.conversation_id or str(uuid.uuid4())
 
                 # Check if this is the first message in the conversation
-                cursor.execute("SELECT COUNT(*) as count FROM chatbot_logs WHERE conversation_id = %s", (conversation_id,))
+                cursor.execute("SELECT COUNT(*) as count FROM chatbot_logs WHERE user_id = %s AND conversation_id = %s", (user_id, conversation_id))
                 row = cursor.fetchone()
                 is_first_message = row["count"] == 0
 
@@ -682,8 +697,7 @@ async def stream_answer(
                     INSERT INTO chatbot_logs (user_id, conversation_id, query, response, title)
                     VALUES (%s, %s, %s, %s, %s)
                 """
-                user_id = current_user["user_id"]
-                conversation_id = str(user_id)
+
                 cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response, chat_title)) 
             conn.commit()
         finally:
