@@ -33,25 +33,9 @@
 ## 🛠️ Tech Stack
 
 * **Backend:** FastAPI, Ollama Llama 3.2
-* **Frontend:** Vite, React, TailwindCSS, Three.js (`three`), React Three Fiber (`@react-three/fiber`), Drei (`@react-three/drei`)
-* **Cache/Message Broker:** Redis
-* **Language:** Python 3.8, JavaScript (ES6)
-
----
-
-## 🗂️ System Architecture
-
-```plaintext
-Client (Vite + React + TailwindCSS)
-          │
-          ├── HTTP API Calls (Axios)
-          │
-    FastAPI Backend (Python)
-          │
-   Ollama Llama 3.2 Model
-          │
-         Redis
-```
+* **Frontend:** Vite, React
+* **Caching:** Redis
+* **Languages:** Python 3.8, JavaScript
 
 ---
 
