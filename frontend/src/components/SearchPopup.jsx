@@ -78,7 +78,19 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
         },
       });
       setResults(res.data);
-      // ...existing code...
+
+      // Auto-scroll to first result if search query is at least 3 characters
+      if (searchTerm.trim().length >= 3 && res.data.length > 0) {
+        setTimeout(() => {
+          if (firstMatchRef.current) {
+            firstMatchRef.current.scrollIntoView({
+              behavior: "smooth",
+              block: "start"
+            });
+          }
+        }, 100); // Small delay so results can render first
+      }
+
     } catch (err) {
       console.error("Search failed:", err);
     }
@@ -106,13 +118,6 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     fetchRecentChats();
   };
 
-  // const handleChatClick = (logId) => {
-  //   if (onChatSelect) {
-  //     onChatSelect(logId);  // ✅ notify App about clicked chat
-  //   } else {
-  //     onClose();
-  //   }
-  // };
   const handleChatClick = (conversationId) => {
     if (onChatSelect) {
       onChatSelect(conversationId);  // Pass conversation_id, not log_id
@@ -240,6 +245,16 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
 
   if (!isOpen) return null; // Only show popup if open
 
+  // Build a map of conversation_id to title (first non-empty title for each conversation)
+  const conversationTitles = {};
+  results.forEach(chat => {
+    if (chat.conversation_id && chat.title && chat.title.trim()) {
+      if (!conversationTitles[chat.conversation_id]) {
+        conversationTitles[chat.conversation_id] = chat.title;
+      }
+    }
+  });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       {/* Ref attached here so we can detect outside clicks for closing the popup */}
@@ -288,6 +303,8 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
             if (!chat.preview || !chat.preview.trim()) return null;
 
             const highlightedPreview = highlightQuery(chat.preview, query);
+            // Use the first available title for this conversation_id
+            const displayTitle = conversationTitles[chat.conversation_id] || "Untitled Chat";
 
             return (
               <div
@@ -297,7 +314,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
                 onClick={() => handleChatClick(chat.conversation_id)}
               >
                 <h3 className="text-base font-normal mb-1 line-clamp-1">
-                  {chat.title?.trim() ? chat.title : "Untitled Chat"}
+                  {displayTitle}
                 </h3>              
                 <p
                   className="text-sm line-clamp-2"
