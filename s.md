@@ -1,6 +1,6 @@
-# 📌 NP × Verztec Team 3 — Lunar AI
+# 📌 NP Team 3 × Verztec Lunar AI
 
-**Lunar AI** is an intelligent chatbot designed to handle corporate queries for Verztec. This project integrates a modern web interface built with Vite, React, and TailwindCSS, alongside a FastAPI backend and Redis for caching.
+**Lunar AI** is an intelligent chatbot designed to handle corporate queries for Verztec. This project integrates a modern web interface built with Vite, React, alongside a FastAPI backend and Redis for caching.
 
 ---
 
