@@ -1562,12 +1562,12 @@ async def transcribe(file: UploadFile = File(...)):
     finally:
         os.remove(tmp_path)
 
-# for chat search functionality
+#chat search functionality
 @app.get("/search")
 async def search_chats(q: str = "", current_user: dict = Depends(get_current_user)):
     """
     Search chats by query, return grouped by unique conversation_id.
-    Each result includes: conversation_id, preview (latest non-empty response), created_at (timestamp of that response).
+    Each result includes: conversation_id, preview (latest non-empty response), created_at (timestamp of that response), and the first non-empty title for that conversation.
     """
     conn = get_db()
     try:
@@ -1587,14 +1587,21 @@ async def search_chats(q: str = "", current_user: dict = Depends(get_current_use
                 for row in rows:
                     # Get latest non-empty response as preview
                     cursor.execute("""
-                        SELECT response, created_at, title FROM chatbot_logs
+                        SELECT response, created_at FROM chatbot_logs
                         WHERE user_id = %s AND conversation_id = %s AND response IS NOT NULL AND response != ''
                         ORDER BY created_at DESC LIMIT 1
                     """, (current_user["user_id"], row["conversation_id"]))
                     preview_row = cursor.fetchone()
                     preview = preview_row["response"] if preview_row else ""
                     created_at = preview_row["created_at"] if preview_row else row["latest_time"]
-                    title = preview_row["title"] if preview_row else ""
+                    # Always get the first non-empty title
+                    cursor.execute("""
+                        SELECT title FROM chatbot_logs
+                        WHERE user_id = %s AND conversation_id = %s AND title IS NOT NULL AND title != ''
+                        ORDER BY created_at ASC LIMIT 1
+                    """, (current_user["user_id"], row["conversation_id"]))
+                    title_row = cursor.fetchone()
+                    title = title_row["title"] if title_row and title_row["title"] else "Untitled Chat"
                     results.append({
                         "conversation_id": str(row["conversation_id"]),
                         "preview": preview,
@@ -1602,6 +1609,7 @@ async def search_chats(q: str = "", current_user: dict = Depends(get_current_use
                         "title": title
                     })
                 return results
+
             # If query, search logs and group by conversation_id
             cursor.execute("""
                 SELECT conversation_id, MAX(created_at) as latest_time
@@ -1611,27 +1619,32 @@ async def search_chats(q: str = "", current_user: dict = Depends(get_current_use
                 ORDER BY latest_time DESC
                 LIMIT 30
             """, (current_user["user_id"], f"%{q}%", f"%{q}%"))
-
             rows = cursor.fetchall()
             results = []
             for row in rows:
                 # Get latest matching non-empty response as preview
                 cursor.execute("""
-                    SELECT response, created_at, title FROM chatbot_logs
+                    SELECT response, created_at FROM chatbot_logs
                     WHERE user_id = %s AND conversation_id = %s AND response LIKE %s AND response IS NOT NULL AND response != ''
                     ORDER BY created_at DESC LIMIT 1
                 """, (current_user["user_id"], row["conversation_id"], f"%{q}%"))
                 preview_row = cursor.fetchone()
                 preview = preview_row["response"] if preview_row else ""
                 created_at = preview_row["created_at"] if preview_row else row["latest_time"]
-                title = preview_row["title"] if preview_row and preview_row["title"] else ""
+                # Always get the first non-empty title
+                cursor.execute("""
+                    SELECT title FROM chatbot_logs
+                    WHERE user_id = %s AND conversation_id = %s AND title IS NOT NULL AND title != ''
+                    ORDER BY created_at ASC LIMIT 1
+                """, (current_user["user_id"], row["conversation_id"]))
+                title_row = cursor.fetchone()
+                title = title_row["title"] if title_row and title_row["title"] else "Untitled Chat"
                 results.append({
                     "conversation_id": str(row["conversation_id"]),
                     "preview": preview,
                     "created_at": created_at,
                     "title": title
                 })
-
             return results
     finally:
         conn.close()
