@@ -14,6 +14,7 @@ const ViewFeedback = () => {
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
   const [expandedFeedback, setExpandedFeedback] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchFeedbacks();
@@ -60,7 +61,7 @@ const ViewFeedback = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://localhost:8000/api/feedback/${id}/status`, {
+      const response = await fetch('http://localhost:8000/api/feedback/${id}/status', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -206,7 +207,7 @@ const ViewFeedback = () => {
 
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mx-4">
         <div className="flex items-center gap-2 mb-2">
           <AlertCircle className="w-5 h-5 text-red-500" />
           <span className="text-red-700 dark:text-red-300 font-medium">Error loading feedbacks</span>
@@ -223,113 +224,128 @@ const ViewFeedback = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Filters and Search */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search feedback..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-
-          {/* Category Filter */}
-          <select
-            value={filters.category}
-            onChange={(e) => setFilters({...filters, category: e.target.value})}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          >
-            <option value="all">All Categories</option>
-            <option value="general">General</option>
-            <option value="bug">Bug Report</option>
-            <option value="feature">Feature Request</option>
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters({...filters, status: e.target.value})}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="reviewed">Reviewed</option>
-            <option value="resolved">Resolved</option>
-          </select>
-
-          {/* Rating Filter */}
-          <select
-            value={filters.rating}
-            onChange={(e) => setFilters({...filters, rating: e.target.value})}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          >
-            <option value="all">All Ratings</option>
-            <option value="with-rating">With Rating</option>
-            <option value="no-rating">No Rating</option>
-          </select>
+    <div className="space-y-4 p-4 md:p-6 max-w-full">
+      {/* Mobile Search and Filter Toggle */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        {/* Search Bar - Always visible */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search feedback..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-base"
+          />
         </div>
 
-        {/* Sort Options */}
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-          >
-            <option value="created_at">Date Created</option>
-            <option value="updated_at">Date Updated</option>
-            <option value="rating">Rating</option>
-            <option value="status">Status</option>
-          </select>
-          <button
-            onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          >
-            {sortOrder === 'desc' ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-          </button>
+        {/* Filter Toggle Button for Mobile */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center gap-2 w-full md:hidden px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+        >
+          <Filter className="w-4 h-4" />
+          <span>Filters & Sort</span>
+          {showFilters ? <ChevronUp className="w-4 h-4 ml-auto" /> : <ChevronDown className="w-4 h-4 ml-auto" />}
+        </button>
+
+        {/* Filters - Desktop always visible, Mobile toggleable */}
+        <div className={`${showFilters ? 'block' : 'hidden'} md:block space-y-4 ${showFilters ? 'mt-4' : ''}`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Category Filter */}
+            <select
+              value={filters.category}
+              onChange={(e) => setFilters({...filters, category: e.target.value})}
+              className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-base"
+            >
+              <option value="all">All Categories</option>
+              <option value="general">General</option>
+              <option value="bug">Bug Report</option>
+              <option value="feature">Feature Request</option>
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={filters.status}
+              onChange={(e) => setFilters({...filters, status: e.target.value})}
+              className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-base"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="resolved">Resolved</option>
+            </select>
+
+            {/* Rating Filter */}
+            <select
+              value={filters.rating}
+              onChange={(e) => setFilters({...filters, rating: e.target.value})}
+              className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-base"
+            >
+              <option value="all">All Ratings</option>
+              <option value="with-rating">With Rating</option>
+              <option value="no-rating">No Rating</option>
+            </select>
+          </div>
+
+          {/* Sort Options */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="flex-1 sm:flex-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              >
+                <option value="created_at">Date Created</option>
+                <option value="updated_at">Date Updated</option>
+                <option value="rating">Rating</option>
+                <option value="status">Status</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+              >
+                {sortOrder === 'desc' ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Stats - Mobile optimized grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <MessageSquare className="w-5 h-5 text-blue-500" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">Total Feedback</span>
+            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{feedbacks.length}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{feedbacks.length}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <Clock className="w-5 h-5 text-yellow-500" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">Pending</span>
+            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Pending</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
             {feedbacks.filter(f => f.status === 'pending').length}
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <Eye className="w-5 h-5 text-blue-500" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">Reviewed</span>
+            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Reviewed</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
             {feedbacks.filter(f => f.status === 'reviewed').length}
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <Check className="w-5 h-5 text-green-500" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">Resolved</span>
+            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Resolved</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
             {feedbacks.filter(f => f.status === 'resolved').length}
           </p>
         </div>
@@ -350,61 +366,70 @@ const ViewFeedback = () => {
           ) : (
             filteredAndSortedFeedbacks.map((feedback) => (
               <div key={feedback.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(feedback.category)}`}>
-                        {getCategoryIcon(feedback.category)}
-                        {feedback.category}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(feedback.status)}`}>
-                        {getStatusIcon(feedback.status)}
-                        {feedback.status}
-                      </span>
-                      {feedback.rating && renderStars(feedback.rating)}
-                    </div>
-                    <div className="mb-2">
-                      <p className={`text-gray-900 dark:text-white ${expandedFeedback === feedback.id ? '' : 'line-clamp-2'}`}>
-                        {feedback.message}
-                      </p>
-                      {feedback.message.length > 100 && (
-                        <button
-                          onClick={() => setExpandedFeedback(expandedFeedback === feedback.id ? null : feedback.id)}
-                          className="text-yellow-600 hover:text-yellow-700 text-sm mt-1 transition-colors"
-                        >
-                          {expandedFeedback === feedback.id ? 'Show less' : 'Show more'}
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                <div className="space-y-3">
+                  {/* Top row - badges and rating */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(feedback.category)}`}>
+                      {getCategoryIcon(feedback.category)}
+                      <span className="hidden sm:inline">{feedback.category}</span>
+                    </span>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(feedback.status)}`}>
+                      {getStatusIcon(feedback.status)}
+                      <span className="hidden sm:inline">{feedback.status}</span>
+                    </span>
+                    {feedback.rating && (
+                      <div className="ml-auto">
+                        {renderStars(feedback.rating)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Message content */}
+                  <div>
+                    <p className={`text-gray-900 dark:text-white ${expandedFeedback === feedback.id ? '' : 'line-clamp-3'}`}>
+                      {feedback.message}
+                    </p>
+                    {feedback.message.length > 150 && (
+                      <button
+                        onClick={() => setExpandedFeedback(expandedFeedback === feedback.id ? null : feedback.id)}
+                        className="text-yellow-600 hover:text-yellow-700 text-sm mt-2 transition-colors"
+                      >
+                        {expandedFeedback === feedback.id ? 'Show less' : 'Show more'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Bottom row - dates and actions */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-500 dark:text-gray-400">
                       <span>Created: {formatDate(feedback.created_at)}</span>
                       {feedback.updated_at !== feedback.created_at && (
                         <span>Updated: {formatDate(feedback.updated_at)}</span>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    {feedback.status === 'pending' && (
-                      <button
-                        onClick={() => updateFeedbackStatus(feedback.id, 'reviewed')}
-                        className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200 transition-colors"
-                      >
-                        Mark as Reviewed
-                      </button>
-                    )}
-                    {feedback.status === 'reviewed' && (
-                      <button
-                        onClick={() => updateFeedbackStatus(feedback.id, 'resolved')}
-                        className="px-3 py-1 text-xs bg-green-100 text-green-800 rounded-full hover:bg-green-200 transition-colors"
-                      >
-                        Mark as Resolved
-                      </button>
-                    )}
-                    {feedback.status === 'resolved' && (
-                      <span className="px-3 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                        Resolved
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {feedback.status === 'pending' && (
+                        <button
+                          onClick={() => updateFeedbackStatus(feedback.id, 'reviewed')}
+                          className="px-3 py-2 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors touch-manipulation"
+                        >
+                          Mark as Reviewed
+                        </button>
+                      )}
+                      {feedback.status === 'reviewed' && (
+                        <button
+                          onClick={() => updateFeedbackStatus(feedback.id, 'resolved')}
+                          className="px-3 py-2 text-sm bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors touch-manipulation"
+                        >
+                          Mark as Resolved
+                        </button>
+                      )}
+                      {feedback.status === 'resolved' && (
+                        <span className="px-3 py-2 text-sm bg-green-100 text-green-800 rounded-lg">
+                          Resolved
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
