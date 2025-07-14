@@ -495,7 +495,8 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Mobile Header */}
+      {/* Mobile Header */}
+      {!(view === "adminConsole" && adminPasswordVerified) && (
         <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setIsSidebarOpen(true)}
@@ -508,6 +509,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
           <img src={isDarkMode ? white_logo : logo} className="w-24" alt="logo" />
           <div className="w-10"></div>
         </div>
+      )}
 
         {/* Desktop Header - Hide in verified admin console */}
         {!(view === "adminConsole" && adminPasswordVerified) && (
