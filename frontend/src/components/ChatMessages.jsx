@@ -7,7 +7,7 @@ import errorIcon from '@/assets/images/error.svg';
 import { useEffect, useRef, useState } from 'react';
 import { useTTS } from '@/contexts/TTSContext';
 
-function ChatMessages({ messages, isLoading }) {
+function ChatMessages({ messages, isLoading, shouldSpeak }) {
   const bottomRef = useRef(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { speakText } = useTTS(); // Get the speakText function from context
@@ -20,13 +20,13 @@ function ChatMessages({ messages, isLoading }) {
 
   // Use the TTS context instead of direct speechSynthesis
   useEffect(() => {
+    if (!shouldSpeak) return;
     if (!messages.length) return;
     const last = messages[messages.length - 1];
-
     if (last.role === 'assistant' && last.content && !last.loading) {
-      speakText(last.content); // Use the context function
+      speakText(last.content);
     }
-  }, [messages, speakText]);
+  }, [messages, speakText, shouldSpeak]);
 
   // Check for dark mode
   useEffect(() => {
