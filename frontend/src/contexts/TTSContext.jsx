@@ -24,7 +24,7 @@ export const TTSProvider = ({ children, selectedAvatar }) => {
     naturalVariation: 0
   });
 
-  // ✅ Function to toggle mute and stop speech immediately
+  // Function to toggle mute and stop speech immediately
   const toggleMute = () => {
     setIsMuted(prev => {
       const newMuted = !prev;
@@ -97,10 +97,10 @@ export const TTSProvider = ({ children, selectedAvatar }) => {
         speakWithVoice();
       };
     }
-  }, [isMuted, selectedAvatar]);  // <--- Add selectedAvatar here
+  }, [isMuted, selectedAvatar]);  
 
 
-  // ✅ Reset viseme animation
+  // Reset viseme animation
   const resetViseme = () => {
     setVisemeData({
       mouthOpen: 0,
@@ -113,7 +113,7 @@ export const TTSProvider = ({ children, selectedAvatar }) => {
     });
   };
 
-  // ✅ Natural mouth animation
+  // Natural mouth animation
   const animateMouth = useCallback(() => {
     let animationId;
     let startTime = Date.now();
@@ -164,7 +164,7 @@ export const TTSProvider = ({ children, selectedAvatar }) => {
       speakText,
       isMuted,
       setIsMuted,
-      toggleMute // ✅ Provide toggleMute in context
+      toggleMute // 
     }}>
       {children}
     </TTSContext.Provider>
