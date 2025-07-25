@@ -51,6 +51,36 @@ const avatarNames = {
 };
 
 function AppContent({ selectedAvatar, setSelectedAvatar }) {
+  // Handler for renaming a chat
+  const handleRenameChat = async (conversationId, newTitle) => {
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`http://localhost:8000/chat-history/${conversationId}/rename`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ title: newTitle })
+      });
+      await loadChats();
+    } catch (e) {
+    }
+  };
+
+  // Handler for deleting a chat
+  const handleDeleteChat = async (conversationId) => {
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`http://localhost:8000/chat-history/${conversationId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await loadChats();
+      if (selectedLogId === conversationId) setSelectedLogId(null);
+    } catch (e) {
+    }
+  };
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -94,7 +124,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
       if (response.ok) {
         const chatTitles = await response.json();
         setChats(chatTitles);
-        setFilteredChats(chatTitles); // show all chats initially
+        setFilteredChats(chatTitles); 
       }
     } catch (error) {
       console.error('Failed to load chats:', error);
@@ -156,7 +186,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
     setSelectedChatMessages([]);
     setIsSidebarOpen(false);
     setView('chat');
-    await loadChats(); // Always reload chat list after new chat
+    await loadChats(); 
   };
 
   const loadChatMessages = async (conversation_id) => {
@@ -212,7 +242,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
     setFilteredChats([]);
     setSelectedChatMessages([]);
     setSelectedLogId(null);
-    setView('chat');  // Optional: Reset view    
+    setView('chat');     
   };
 
   const handleAvatarChange = (avatarName) => {
@@ -227,7 +257,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
 
   const handleChatSelect = async(conversation_id) => {
     setSelectedLogId(conversation_id);
-    setConversationId(conversation_id); // Set conversationId here
+    setConversationId(conversation_id); 
     setView('chat');
     setIsSidebarOpen(false);
     setIsSearchOpen(false);
@@ -239,11 +269,11 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
       });
     if (response.ok) {
       const fullChat = await response.json();
-      console.log("Fetched messages for conversation", conversation_id, fullChat); // 👈 ADD THIS
-      setSelectedChatMessages(fullChat);  // Set full chat here
+      console.log("Fetched messages for conversation", conversation_id, fullChat); 
+      setSelectedChatMessages(fullChat);  
     } else {
       console.warn("Chat history not found or failed for", conversation_id);
-      setSelectedChatMessages([]);  // Clear if no chat
+      setSelectedChatMessages([]); 
     }
   } catch (error) {
     console.error('Failed to load chat messages:', error);
@@ -314,12 +344,15 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
       )}
 
       {/* Enhanced Sidebar with Avatar and Chat Search - Hide in verified admin console */}
+
+
+      {/* Enhanced Sidebar with Avatar and Chat Search - Hide in verified admin console */}
       {!(view === "adminConsole" && adminPasswordVerified) && (
         <div className={`
           fixed lg:relative inset-y-0 left-0 z-50 w-80 lg:w-64 xl:w-72 2xl:w-80
           transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           transition-transform duration-300 ease-in-out
-          ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}
+          ${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
           border-r flex flex-col
         `}>
           {/* Sidebar Header */}
@@ -337,7 +370,6 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
                 </svg>
               </button>
             </div>
-            
             {/* New Chat Button */}
             <button
               onClick={handleNewChat}
@@ -345,7 +377,6 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
             >
               + New Chat
             </button>
-
             {/* Chat Search Button */}
             <div className="relative">
               <button
@@ -423,37 +454,21 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
             </div>
           </div>
 
-          {/* Chat List */}
-          <div className="flex-1 overflow-y-auto p-2">
-            {filteredChats.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                {chatSearchQuery ? 'No chats found' : 'No chats yet'}
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {filteredChats.map((chat) => (
-                  <button
-                    key={chat.conversation_id}
-                    onClick={() => handleChatSelect(chat.conversation_id)}
-                    className={`
-                      w-full text-left p-3 rounded-md transition-colors
-                      ${selectedLogId === chat.conversation_id
-                        ? 'bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-yellow-500'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }
-                    `}
-                  >
-                    <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
-                      {chat.title || 'Untitled Chat'}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Chat List with 3-dots menu */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <Sidebar
+              chats={filteredChats}
+              selectedChatId={selectedLogId}
+              onSelectChat={handleChatSelect}
+              onRenameChat={handleRenameChat}
+              onDeleteChat={handleDeleteChat}
+              onNewChat={handleNewChat}
+              onSearch={() => setIsSearchOpen(true)}
+            />
           </div>
 
-          {/* User Role Panel */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          {/* User Role Panel - sticky bottom */}
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-inherit">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -474,7 +489,6 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                
                 {/* Profile Dropdown */}
                 <div className="relative">
                   <ProfileDropdown
@@ -495,8 +509,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 min-w-0">
-      {/* Mobile Header */}
-      {!(view === "adminConsole" && adminPasswordVerified) && (
+        {/* Mobile Header */}
         <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setIsSidebarOpen(true)}
@@ -509,7 +522,6 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
           <img src={isDarkMode ? white_logo : logo} className="w-24" alt="logo" />
           <div className="w-10"></div>
         </div>
-      )}
 
         {/* Desktop Header - Hide in verified admin console */}
         {!(view === "adminConsole" && adminPasswordVerified) && (
@@ -624,8 +636,8 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
                     selectedLogId={selectedLogId}
                     onNewChatCreated={handleNewChatCreated}
                     messages={selectedChatMessages}
-                    conversationId={conversationId} // ⬅ ADD THIS
-                    setConversationId={setConversationId} // ⬅ ADD THIS     
+                    conversationId={conversationId} 
+                    setConversationId={setConversationId}   
                   />
                 )}
                 {view === 'feedback' && (
