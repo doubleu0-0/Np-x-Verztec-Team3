@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*grpcio.*", module="opentelemetry.*")
 # === FastAPI Core ===
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, Form, Body, Path as FastAPIPath
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, Form, Body, Path as FastAPIPath, Query
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -67,6 +67,10 @@ MIMEMultipart = email.mime.multipart.MIMEMultipart
 import secrets
 import hashlib
 import base64
+
+# === Translation ====
+import argostranslate.package
+import argostranslate.translate
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = PROJECT_ROOT / "pipeline" / "data" / "raw_data"
@@ -888,8 +892,6 @@ def delete_file(filename: str, current_user: dict = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-from fastapi import Query
-
 @app.get("/logs/{log_type}")
 async def get_logs(
     log_type: str,
@@ -1231,7 +1233,7 @@ async def upload_xlsx(
                         detail=f"Department must be {current_user['department']}"
                     )
 
-            if not isinstance(email, str) or not (email.endswith("@verztec.com") or email.endswith("@gmail.com")): # THE @GMAIL IS ONLY FOR TESTING THE EMAIL SENDING
+            if not isinstance(email, str) or not (email.endswith("@verztec.com") or email.endswith("@gmail.com")): # @gmail.com here to test the email sending
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid or missing email"
@@ -2585,3 +2587,29 @@ async def update_feedback_status(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating feedback status: {str(e)}")
+
+class TranslationRequest(BaseModel):
+    text: str
+    from_lang: str
+    to_lang: str
+
+class TranslationResponse(BaseModel):
+    translated_text: str
+    from_lang: str
+    to_lang: str
+
+@app.post("/translate", response_model=TranslationResponse)
+async def translate_text(request: TranslationRequest):
+    try:
+        translated = argostranslate.translate.translate(
+            request.text, 
+            request.from_lang, 
+            request.to_lang
+        )
+        return TranslationResponse(
+            translated_text=translated,
+            from_lang=request.from_lang,
+            to_lang=request.to_lang
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
