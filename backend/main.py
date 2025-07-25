@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*grpcio.*", module="opentelemetry.*")
 # === FastAPI Core ===
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, Form, Body
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, Form, Body, Path as FastAPIPath
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -2377,6 +2377,10 @@ class ChatTitle(BaseModel):
     title: str
     created_at: datetime
 
+
+class ChatRenameRequest(BaseModel):
+    title: str
+
 class ChatLog(BaseModel):
     conversation_id: str
     content: str
@@ -2415,6 +2419,7 @@ async def get_chat_titles(current_user: dict = Depends(get_current_user)):
     finally:
         conn.close()
 
+
 @app.get("/chat-history/{conversation_id}", response_model=List[ChatLog])
 async def get_chat_history(conversation_id: str, current_user: dict = Depends(get_current_user)):
     conn = get_db()
@@ -2446,6 +2451,43 @@ async def get_chat_history(conversation_id: str, current_user: dict = Depends(ge
                         "created_at": row['created_at']
                     })
             return messages
+    finally:
+        conn.close()
+
+# === Rename chat title ===
+@app.put("/chat-history/{conversation_id}/rename")
+async def rename_chat_title(
+    conversation_id: str = FastAPIPath(...),
+    req: ChatRenameRequest = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE chatbot_logs SET title = %s WHERE user_id = %s AND conversation_id = %s",
+                (req.title, current_user["user_id"], conversation_id)
+            )
+            conn.commit()
+        return {"message": "Chat title updated"}
+    finally:
+        conn.close()
+
+# === Delete chat ===
+@app.delete("/chat-history/{conversation_id}")
+async def delete_chat(
+    conversation_id: str = FastAPIPath(...),
+    current_user: dict = Depends(get_current_user)
+):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM chatbot_logs WHERE user_id = %s AND conversation_id = %s",
+                (current_user["user_id"], conversation_id)
+            )
+            conn.commit()
+        return {"message": "Chat deleted"}
     finally:
         conn.close()
 
