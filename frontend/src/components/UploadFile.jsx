@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { UploadCloud, Globe, MapPin, Lock, Building, Users } from 'lucide-react';
+import axios from 'axios';
 
 const ALL_COUNTRIES = ['Singapore', 'United Kingdom', 'United States', 'Thailand', 
   'Indonesia', 'Korea', 'China', 'Japan', 'Vietnam', 'Myanmar'];
 const ALL_DEPARTMENTS = ['Human Resource', 'Admin & Operations', 'Project Management',
   'Procurement', 'IT', 'Marketing', 'Business Development', 'Finance', 'Service Delivery'];
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 export default function UploadFile() {
   const [file, setFile] = useState(null);
@@ -13,9 +15,9 @@ export default function UploadFile() {
   const [status, setStatus] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [fileList, setFileList] = useState([]);
-  const [user, setUser] = useState({ role: 'ADMIN', country: 'Singapore', department: 'IT' }); // Mock user for demo
+  const [user, setUser] = useState(null);
   const [accessLevel, setAccessLevel] = useState('ALL');
-  const VITE_BASE_URL = 'localhost'; // Mock for demo
+  const VITE_BASE_URL = import.meta.env.VITE_API_URL;
 
   // Form state
   const [selectedCountries, setSelectedCountries] = useState([]);
@@ -33,6 +35,24 @@ export default function UploadFile() {
       setSelectedCountry(user.country);
     }
   }, [user]);
+
+  // Fetch user data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`http://${remoteip}:8000/profile`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUser(response.data.session);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        // Handle error - maybe redirect to login
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   // Handle file selection
   const handleFileChange = (e) => {
@@ -81,7 +101,7 @@ export default function UploadFile() {
     }
   };
 
-  // Mock upload handler
+  // Upload handler
   const handleUpload = async () => {
     if (!file) {
       setStatus('No file selected');
@@ -93,12 +113,39 @@ export default function UploadFile() {
     }
 
     setIsUploading(true);
-    // Simulate upload
-    setTimeout(() => {
+    setStatus('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Prepare countries and departments arrays
+      const countries = selectedCountry === 'ALL' ? ALL_COUNTRIES : [selectedCountry];
+      const departments = selectedDepartment === 'ALL' ? ALL_DEPARTMENTS : [selectedDepartment];
+      
+      formData.append('countries', JSON.stringify(countries));
+      formData.append('departments', JSON.stringify(departments));
+
+      const response = await axios.post(`http://${remoteip}:8000/upload-file`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
       setStatus('File uploaded successfully!');
-      setIsUploading(false);
       setFile(null);
-    }, 2000);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setStatus(`Upload failed: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // Handle multiple file selection
@@ -108,7 +155,7 @@ export default function UploadFile() {
     setStatus('');
   };
 
-  // Mock batch upload handler
+  // Batch upload handler
   const handleBatchUpload = async () => {
     if (files.length === 0) {
       setStatus('No files selected');
@@ -120,12 +167,44 @@ export default function UploadFile() {
     }
 
     setIsUploading(true);
-    // Simulate batch upload
-    setTimeout(() => {
+    setStatus('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      
+      // Append all files
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+      
+      // Prepare countries and departments arrays
+      const countries = selectedCountry === 'ALL' ? ALL_COUNTRIES : [selectedCountry];
+      const departments = selectedDepartment === 'ALL' ? ALL_DEPARTMENTS : [selectedDepartment];
+      
+      formData.append('countries', JSON.stringify(countries));
+      formData.append('departments', JSON.stringify(departments));
+
+      const response = await axios.post(`http://${remoteip}:8000/batch-upload-files`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
       setStatus(`Successfully uploaded ${files.length} files`);
       setFiles([]);
+      // Reset file input
+      const fileInput = document.querySelector('input[type="file"][multiple]');
+      if (fileInput) {
+        fileInput.value = '';
+      }
+    } catch (error) {
+      console.error('Batch upload error:', error);
+      setStatus(`Batch upload failed: ${error.response?.data?.detail || error.message}`);
+    } finally {
       setIsUploading(false);
-    }, 2000);
+    }
   };
 
   // UI rendering rules

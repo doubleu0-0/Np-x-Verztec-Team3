@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 const Feedback = ({ userProfile, isDarkMode }) => {
   const [feedback, setFeedback] = useState({
@@ -24,7 +25,7 @@ const Feedback = ({ userProfile, isDarkMode }) => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/feedback', {
+      const response = await fetch(`http://${remoteip}:8000/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

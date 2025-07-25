@@ -1,6 +1,7 @@
 // Create: frontend/src/components/PasswordReset.jsx
 import { useState, useEffect } from 'react';
 import Toast from './Toast';
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 export default function PasswordReset({ onComplete }) {
   const [password, setPassword] = useState('');
@@ -48,7 +49,7 @@ export default function PasswordReset({ onComplete }) {
     setLoading(true);
     
     try {
-      const response = await fetch('http://localhost:8000/reset-password', {
+      const response = await fetch(`http://${remoteip}:8000/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

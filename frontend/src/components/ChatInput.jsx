@@ -2,6 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import useAutosize from '@/hooks/useAutosize';
 import sendIcon from '@/assets/images/send.svg';
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 function ChatInput({ newMessage, isLoading, setNewMessage, submitNewMessage }) {
   const textareaRef = useAutosize(newMessage);
@@ -41,7 +42,7 @@ function ChatInput({ newMessage, isLoading, setNewMessage, submitNewMessage }) {
         formData.append('file', audioBlob, 'recording.webm');
 
         try {
-          const res = await axios.post('http://localhost:8000/transcribe', formData, {
+          const res = await axios.post(`http://${remoteip}:8000/transcribe`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
           });
           setNewMessage(res.data.text || '');
@@ -66,7 +67,7 @@ function ChatInput({ newMessage, isLoading, setNewMessage, submitNewMessage }) {
   };
 
   return (
-    <div className='sticky bottom-0 shrink-0 bg-transparent dark:bg-transparent py-4'>
+    <div className='sticky bottom-0 shrink-0 bg-transparent dark:bg-transparent py-2'>
       <div className='p-1.5 bg-primary-blue/35 dark:bg-gray-700 rounded-3xl'>
         <div className='pr-0.5 bg-white dark:bg-gray-900 relative shrink-0 rounded-3xl ring-primary-blue ring-1 focus-within:ring-2'>
           <textarea

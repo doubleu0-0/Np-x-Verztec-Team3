@@ -20,6 +20,7 @@ import pymysql
 import pymysql.cursors
 from io import BytesIO
 from openpyxl import load_workbook
+from fastapi import Query
 
 # === LLMs & Vector Store ===
 import ollama
@@ -33,9 +34,11 @@ from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, Filt
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.base.embeddings.base import BaseEmbedding
+from llama_index.core.llms import ChatMessage, MessageRole
 
 # === Utilities ===
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
+import time as sleep_time
 from urllib.parse import quote
 from enum import Enum
 from sentence_transformers import SentenceTransformer
@@ -93,19 +96,21 @@ GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 EMAIL_SENDER_USER = os.getenv("EMAIL_SENDER_USER")
 EMAIL_SENDER_APP_PASSWORD = os.getenv("EMAIL_SENDER_APP_PASSWORD")
+    
+REMOTE_IP = os.getenv("REMOTE_IP")
+LOCAL_IP = os.getenv("LOCAL_IP")
 
 # Connect to Redis
-redis_client = redis.Redis(host='localhost', port=6380, db=0, decode_responses=True)
+redis_client = redis.Redis(host=LOCAL_IP, port=6380, db=0, decode_responses=True)
 
 # Set up Ollama and HuggingFace embedding
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
-remote_base_url = "http://localhost:11434"
+remote_base_url = f"http://{REMOTE_IP}:11434"
 
 # Instantiate the Ollama LLM
 llm = Ollama(model="llama3.2:latest", request_timeout=120.0, temperature=0, context_window=4096, base_url=remote_base_url)
 light_llm = Ollama(model="llama3.2:1b",context_window=1024,base_url=remote_base_url)
 Settings.llm = llm
-memory = ChatMemoryBuffer.from_defaults(token_limit=1024)
 
 
 # Initialize ChromaDB client
@@ -154,9 +159,8 @@ db = chromadb.PersistentClient(path=str(PERSIST_DIR))
 chroma_collection = db.get_or_create_collection("quickstart", embedding_function=chroma_embedding_fn)
 vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
-index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
+index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context, embed_model=llama_embedding_fn)
 query_engine = index.as_query_engine(similarity_top_k=5, streaming=True)
-
 
 # --- Utility to get user info from token/redis ---
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -208,6 +212,7 @@ class UserMessage(BaseModel):
     message: str
     model: str = "llama3.2:latest"  # default model
     conversation_id: Optional[str] = None
+    original_message: Optional[str] = None
 
 def get_llm(model_name: str):
     if model_name == "llama3.2:1b":
@@ -255,21 +260,60 @@ def generate_chat_title(user_prompt: str, model_name: str = "llama3.2:1b") -> st
     return title.title()
 
 
+def get_conversation_memory_from_db(conversation_id: str, user_id: int) -> ChatMemoryBuffer:
+    """
+    Reconstruct conversation memory from database logs.
+    This is more scalable than storing in RAM.
+    """
+    memory = ChatMemoryBuffer.from_defaults(token_limit=1500)
+    
+    if not conversation_id:
+        return memory
+    
+    try:
+        conn = get_db()
+        with conn.cursor() as cursor:
+            # Get recent conversation history (last 10 exchanges to limit memory usage)
+            cursor.execute("""
+                SELECT query, response FROM chatbot_logs 
+                WHERE user_id = %s AND conversation_id = %s 
+                ORDER BY created_at ASC 
+                LIMIT 20
+            """, (user_id, conversation_id))
+            
+            rows = cursor.fetchall()
+            
+            # Rebuild conversation memory from database
+            for row in rows:
+                if row['query']:
+                    memory.put(ChatMessage.from_str(row['query'], role=MessageRole.USER))
+                if row['response']:
+                    memory.put(ChatMessage.from_str(row['response'], role=MessageRole.ASSISTANT))
+                    
+        return memory
+    except Exception as e:
+        print(f"Error loading conversation memory: {e}")
+        return ChatMemoryBuffer.from_defaults(token_limit=1500)
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
 @app.post("/process")
 async def process_message(
     data: UserMessage,
     current_user: dict = Depends(get_current_user)
 ):
     conversation_id = data.conversation_id or str(uuid.uuid4())  # Generate a new one if not passed
+    # Get conversation memory from database (not RAM)
+    conversation_memory = get_conversation_memory_from_db(conversation_id, current_user["user_id"])
+    
     llm_model = get_llm(model_name=data.model)
     questions = extract_questions(data.message)
     user_prompt = data.message
 
     if not questions:
         print("[INFO] No HR-related questions found. Generating fallback...")
-        fallback_prompt = f"""
-        The user said: "{data.message}"
-        You are Verztec's AI HR assistant. The user did not ask any HR-related questions or concerns.
+        fallback_prompt = f"""You are Verztec's AI HR assistant. The user did not ask any HR-related questions or concerns.
         If the message isn't about HR (like leave, claims, benefits, or work policies), reply in a super casual, friendly manner. 
         No formal greetings, no sign-offs, no long explanations. Just a short, warm, human reply.
         If the user says something sweet or emotional (like "thank you" or "you're the best"), feel free to respond in kind—e.g., "Aww, thanks!", "You're awesome!", or use emojis.
@@ -292,7 +336,13 @@ async def process_message(
         """
         print(f"[Process] Querying with: {user_prompt}")
         query_engine = index.as_query_engine(streaming=True, llm=llm_model)
-        response = query_engine.query(f"{fallback_prompt}")
+        chat_engine = index.as_chat_engine(
+            chat_mode="context",
+            memory=conversation_memory,
+            system_prompt=fallback_prompt,
+            query_engine=query_engine
+        )
+        response = chat_engine.stream_chat(f"{user_prompt}")
     
         def stream_generator():
             buffer = io.StringIO()
@@ -339,20 +389,23 @@ async def process_message(
                     else:
                         chat_title = None
                     sql = """
-                        INSERT INTO chatbot_logs (user_id, conversation_id, query, response, title)
-                        VALUES (%s, %s, %s, %s, %s)
+                        INSERT INTO chatbot_logs (user_id, username, conversation_id, query, response, title)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                     """
-                    cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response, chat_title))    
+                    cursor.execute(sql, (user_id, current_user["username"], conversation_id, user_prompt, final_response, chat_title))
                 conn.commit()
             finally:
                 conn.close()
 
         return StreamingResponse(streaming_with_logging(), media_type="text/plain")
     else:
-        # Stream the questions as a single JSON object (one chunk)
+        # Stream the questions as a single JSON object (one chunk) WITH the original message
         import json
         def questions_stream():
-            yield json.dumps({"questions": questions})
+            yield json.dumps({
+                "questions": questions,
+                "original_message": data.message  # Add the original message here
+            })
         return StreamingResponse(questions_stream(), media_type="application/json")
 
     
@@ -391,16 +444,17 @@ async def stream_answer(
     data: UserMessage,
     current_user: dict = Depends(get_current_user)
 ):
-    
     conversation_id = data.conversation_id
     if not conversation_id:
         print("[WARNING] No conversation_id provided. Cannot log chat properly.")
-
+    
+    # Get conversation memory from database (not RAM)
+    conversation_memory = get_conversation_memory_from_db(conversation_id, current_user["user_id"])
+ 
     # Set up the LLM based on user role
     role = current_user.get("role")
     country = current_user.get("country")
     department = current_user.get("department")
-    email = current_user.get("email")
 
     def normalize_key(key):
         return key.strip()
@@ -408,9 +462,13 @@ async def stream_answer(
     country_key = normalize_key(country)
     department_key = normalize_key(department)
 
+    llm_model = get_llm(model_name=data.model)
+    print(f"[DEBUG] User role: {role}, country: {country}, department: {department}")
 
+    # Create the appropriate retriever based on user role
     if role == "ADMIN":
         retriever = VectorIndexRetriever(index=index, similarity_top_k=5)
+        print("[DEBUG] Using UNFILTERED retriever for ADMIN")
     else:
         filters = MetadataFilters(
             filters=[
@@ -419,21 +477,42 @@ async def stream_answer(
             ]
         )
         retriever = VectorIndexRetriever(index=index, similarity_top_k=5, filters=filters)
+        print(f"[DEBUG] Using FILTERED retriever for {role}: {country_key}={department_key}")
 
-    llm_model = get_llm(model_name=data.model)
+    # Create response synthesizer and query engine with the correct retriever
     response_synthesizer = get_response_synthesizer(response_mode="tree_summarize", llm=llm_model, streaming=True)
-    query_engine = RetrieverQueryEngine(retriever=retriever, response_synthesizer=response_synthesizer)
+    custom_query_engine = RetrieverQueryEngine(retriever=retriever, response_synthesizer=response_synthesizer)
+    
     user_prompt = data.message
-    #conversation_id = data.conversation_id or str(uuid.uuid4())
+    # Use original_message for logging if available, otherwise fall back to processed message
+    original_user_message = data.original_message or data.message
 
+    system_prompt = f"""
+    You are Verztec's AI HR assistant.
+    You have access to the full conversation history and should use it to answer follow-up questions.
+    You are able to provide information about HR policies, leave, benefits, claims, WFH, or company policies.
+    Answer all questions in a friendly and human-like manner. If you are not confident about the answer,
+    you should tell the user that you are not sure and suggest they contact HR directly.
+    """
+    
     print(f"[STREAM] Querying with: {data.message}")
-    response = query_engine.query(f"{user_prompt}")
+    
+    # Create chat engine with the filtered query engine
+    chat_engine = index.as_chat_engine(
+        chat_mode="context",
+        memory=conversation_memory,
+        system_prompt=system_prompt,
+        query_engine=custom_query_engine
+    )
+
+    response = chat_engine.stream_chat(f"{user_prompt}")
 
     # Helper to check for boilerplate/empty responses
     def is_response_empty(resp):
+        print("[DEBUG] is_response_empty() called")
         BOILERPLATE = [
             "no response",
-            "no relevant information found",
+            "no relevant information found", 
             "no answer found",
             "no content",
             "empty response",
@@ -444,30 +523,62 @@ async def stream_answer(
             r"I' couldn't",
         ]
         if resp is None:
+            print("[DEBUG] Response is None")
             return True
+
+        print(f"[DEBUG] Response type: {type(resp)}")
+
+        # Check response attribute first
         if hasattr(resp, "response"):
             text = str(resp.response).strip().lower()
-            if not text or text in BOILERPLATE:
+            print(f"[DEBUG] Found response attribute: {repr(text[:100])}")
+            if text and any(phrase in text for phrase in BOILERPLATE):
+                print("[DEBUG] Response marked as empty due to boilerplate in response attribute")
                 return True
+
+        # Check streaming response generator
         if hasattr(resp, "response_gen"):
+            print("[DEBUG] Found response_gen attribute, attempting to peek...")
             try:
                 gen = resp.response_gen
-                peeked = list(itertools.islice(gen, 3))
-                # Debug: print the peeked chunks
-                print("[DEBUG] Peeked streaming chunks:")
+                # Peek at the first 10 tokens WITHOUT consuming them permanently
+                peeked = []
+                for i, token in enumerate(gen):
+                    peeked.append(token)
+                    if i >= 9:  # Peek at first 10 tokens (0-9)
+                        break
+                        
+                print(f"[DEBUG] Peeked {len(peeked)} streaming chunks:")
                 for i, chunk in enumerate(peeked):
                     print(f"  Chunk {i+1}: {repr(chunk)}")
-                # Re-chain for later streaming
-                resp.response_gen = itertools.chain(peeked, gen)
-                joined = " ".join(str(t).strip().lower() for t in peeked if t)
-                for phrase in BOILERPLATE:
-                    if joined.startswith(phrase):
-                        return True
-                if not joined:
+                    
+                joined = " ".join(str(chunk).strip().lower() for chunk in peeked if chunk and str(chunk).strip())
+                print(f"[DEBUG] Joined peeked content: {repr(joined[:200])}")
+                
+                if not joined.strip():
+                    print("[DEBUG] No content found in peeked chunks")
                     return True
+                    
+                for phrase in BOILERPLATE:
+                    if phrase in joined:
+                        print(f"[DEBUG] Found boilerplate phrase: '{phrase}' in content")
+                        if len(joined) < 100:
+                            return True
+                            
+                print("[DEBUG] Response appears to have valid content")
+                
+                # Store peeked tokens in a custom attribute instead of trying to replace response_gen
+                resp._peeked_tokens = peeked
+                resp._original_gen = gen
+                return False
+                
             except Exception as e:
                 print(f"[DEBUG] Exception while peeking response_gen: {e}")
+                import traceback
+                traceback.print_exc()
                 return True
+
+        print("[DEBUG] No response_gen attribute found, assuming not empty")
         return False
 
     is_empty = is_response_empty(response)
@@ -478,22 +589,34 @@ async def stream_answer(
         fallback_text = llm_model.complete(
             f"You are Verztec's AI HR assistant. The user asked: '{user_prompt}'. "
             "You do not have information on this topic. "
-            "Reply ONLY with: 'I am sorry, but I do not have information on this topic.' "
-            "Then, state the user's role and country."
-            f" User role: {role}, User country: {country}, User department: {department}."
+            "Reply with: 'I am sorry, but I do not have information on this topic.' "
+            "You can try and help the user by suggesting they contact HR directly for assistance."
         )
         raw_text = fallback_text.text.strip()
+
+        # Add metadata to indicate this is an empty response
+        response_with_metadata = f"{raw_text}\n\n__EMPTY_RESPONSE_METADATA__"
 
         # --- Log fallback to DB using same conversation ID ---
         try:
             conn = get_db()
             with conn.cursor() as cursor:
                 sql = """
-                    INSERT INTO chatbot_logs (user_id, conversation_id, query, response)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO chatbot_logs (user_id, username, conversation_id, query, response, title)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 """
                 user_id = current_user["user_id"]
-                cursor.execute(sql, (user_id, conversation_id, user_prompt, raw_text))
+
+                # Generate title for fallback response if it's the first message
+                cursor.execute("SELECT COUNT(*) as count FROM chatbot_logs WHERE user_id = %s AND conversation_id = %s", (user_id, conversation_id))
+                row = cursor.fetchone()
+                is_first_message = row["count"] == 0
+                
+                chat_title = None
+                if is_first_message:
+                    chat_title = generate_chat_title(original_user_message)
+
+                cursor.execute(sql, (user_id, current_user["username"], conversation_id, original_user_message, raw_text, chat_title))
             conn.commit()
         finally:
             conn.close()
@@ -507,7 +630,7 @@ async def stream_answer(
             department = current_user.get("department", "unknown")
             msg_body = (
                 f"User info: role={role}, country={country}, department={department}, email={user_email}\n\n"
-                f"User query:\n{user_prompt}\n\n"
+                f"User query:\n{original_user_message}\n\n"
                 f"Chatbot response:\n{raw_text}\n"
             )
             send_email(
@@ -522,24 +645,8 @@ async def stream_answer(
             print(f"[Fallback Email] Failed to send fallback email: {e}")
 
         def fallback_stream():
-            yield raw_text
+            yield response_with_metadata
         return StreamingResponse(fallback_stream(), media_type="text/plain")
-
-    ''' # This the old one with chat engine
-    chat_engine = index.as_chat_engine(
-            chat_mode="context",
-            memory=memory,
-            system_prompt=f"""
-            You are Verztec's AI HR assistant.
-            You have access to the full conversation history and should use it to answer follow-up questions.
-            You are able to provide information about HR policies, leave, benefits, claims, WFH, or company policies.
-            Answer all questions in a friendly and human-like manner. If you are not confident about the answer,
-            you should tell the user that you are not sure and suggest they contact HR directly.
-            """,
-            llm=llm_model
-        )
-    response = chat_engine.stream_chat(data.message)
-    '''
 
     # Check the citations for non-empty source nodes
 
@@ -573,7 +680,7 @@ async def stream_answer(
 
             Select the most relevant document numbers (e.g., "1,3,5"). 
             If you think none are relevant, respond with "none".
-            Be specific and strictly choose the documents, best number is 1 citation only.
+            Best number is 1 citation only.
             Only respond with the numbers, comma-separated.
             """
 
@@ -595,26 +702,47 @@ async def stream_answer(
     def stream_generator():
         buffer = io.StringIO()
         response_text = ""
-        try:
-            for token in response.response_gen:
+        
+        # Check if we have peeked tokens stored
+        if hasattr(response, '_peeked_tokens') and hasattr(response, '_original_gen'):
+            print("[DEBUG] Using restored generator with peeked tokens")
+            
+            # First yield the peeked tokens
+            for token in response._peeked_tokens:
                 if token is not None:
                     buffer.write(token)
                     response_text += token
                     yield token
-        except Exception as e:
-            yield f"\n\n[ERROR streaming response: {e}]"
+            
+            # Then yield the rest from the original generator
+            try:
+                for token in response._original_gen:
+                    if token is not None:
+                        buffer.write(token)
+                        response_text += token
+                        yield token
+            except Exception as e:
+                yield f"\n\n[ERROR streaming response: {e}]"
+        else:
+            # Fallback to original behavior if no peeked tokens
+            print("[DEBUG] Using original generator")
+            gen = response.response_gen
+            try:
+                for token in gen:
+                    if token is not None:
+                        buffer.write(token)
+                        response_text += token
+                        yield token
+            except Exception as e:
+                yield f"\n\n[ERROR streaming response: {e}]"
 
-        # Add animated loading indicator
-        yield "\n\nEvaluating citations"
-        
-        # Simple citation evaluation with progress dots
+        # Signal citation processing start
+        yield "\n\n__CITATION_START__"
+        yield "\n"  # <-- Add this line to force a chunk between start and end
+
+        # Rest of your citation logic...
         try:
             print("[Citation Evaluation] Evaluating citations...")
-            
-            # Show progress animation
-            for i in range(3):
-                yield "."
-                # Small delay simulation - in real app you might want to split the evaluation
             
             selected_indices = simple_citation_evaluator_indices(
                 query=user_prompt,
@@ -623,11 +751,12 @@ async def stream_answer(
                 llm_model=llm_model
             )
 
-            yield "\n"  # Close the loading message
+            # Signal citation processing end
+            yield "__CITATION_END__"
             
         except Exception as e:
             print(f"[Citation Error] {e}")
-            selected_docs = []
+            yield "__CITATION_END__"  # Still end citation processing even on error
             yield "\nError evaluating citations\n"
             return
 
@@ -651,7 +780,7 @@ async def stream_answer(
                     seen_docs.append(doc_name)
                     # Get the real file path
                     real_file = get_real_file(doc_name)
-                    url = f"http://localhost:8000/download/{quote(real_file)}"
+                    url = f"http://{REMOTE_IP}:8000/download/{quote(real_file)}"
                     yield f"- [{real_file}]({url})\n"
         else:
             yield "**📄 No relevant documents found**\n"
@@ -689,22 +818,72 @@ async def stream_answer(
 
                 chat_title = None
                 if is_first_message:
-                    chat_title = generate_chat_title(user_prompt)
+                    chat_title = generate_chat_title(original_user_message)
                 else:
                     chat_title = None
 
                 sql = """
-                    INSERT INTO chatbot_logs (user_id, conversation_id, query, response, title)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO chatbot_logs (user_id, username, conversation_id, query, response, title)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 """
 
-                cursor.execute(sql, (user_id, conversation_id, user_prompt, final_response, chat_title)) 
+                cursor.execute(sql, (user_id, current_user["username"], conversation_id, original_user_message, final_response, chat_title)) 
             conn.commit()
         finally:
             conn.close()
 
     return StreamingResponse(streaming_with_logging(), media_type="text/plain")
 
+@app.post("/forward-to-hr")
+async def forward_to_hr(
+    data: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Forward user query to HR support via email"""
+    try:
+        query = data.get("query", "")
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+
+        # Get user info
+        role = current_user.get("role")
+        country = current_user.get("country")
+        department = current_user.get("department")
+        user_email = current_user.get("email", "unknown")
+
+        # Send email to HR
+        sender = EMAIL_SENDER_USER
+        recipient = GMAIL_USER
+        subject = "[HR Support Request] User Query Forwarded"
+        msg_body = (
+            f"A user has requested HR support for their query:\n\n"
+            f"User Info:\n"
+            f"- Name: {current_user.get('username', 'Unknown')}\n"
+            f"- Email: {user_email}\n"
+            f"- Role: {role}\n"
+            f"- Country: {country}\n"
+            f"- Department: {department}\n\n"
+            f"User Query:\n{query}\n\n"
+            f"Please follow up with the user directly at {user_email}.\n"
+        )
+        
+        email_sent = send_email(
+            to_email=recipient,
+            subject=subject,
+            body=msg_body,
+            is_html=False,
+            sender=sender
+        )
+
+        if email_sent:
+            return {"message": "Your query has been forwarded to HR support. You should receive a response within 24 hours."}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to forward query to HR")
+
+    except Exception as e:
+        print(f"[Forward to HR] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to forward query: {str(e)}")
+    
 
 # Download files
 @app.get("/download/{filename}")
@@ -787,30 +966,28 @@ async def get_files(current_user: dict = Depends(get_current_user)):
                 # Managers only see files for their country and department
                 cursor.execute("""
                     SELECT 
-                        f.file_id,
-                        f.file_name,
-                        u.username AS uploaded_by,
-                        f.countries,
-                        f.departments,
-                        f.upload_time
-                    FROM files f
-                    LEFT JOIN users u ON f.uploaded_by = u.user_id
-                    WHERE FIND_IN_SET(%s, REPLACE(f.countries, ', ', ',')) > 0
-                    ORDER BY f.upload_time DESC
+                        file_id,
+                        file_name,
+                        uploaded_by_username AS uploaded_by,
+                        countries,
+                        departments,
+                        upload_time
+                    FROM files
+                    WHERE FIND_IN_SET(%s, REPLACE(countries, ', ', ',')) > 0
+                    ORDER BY upload_time DESC
                 """, (current_user["country"],))
             else:
                 # Admins see all files
                 cursor.execute("""
                     SELECT 
-                        f.file_id,
-                        f.file_name,
-                        u.username AS uploaded_by,
-                        f.countries,
-                        f.departments,
-                        f.upload_time
-                    FROM files f
-                    LEFT JOIN users u ON f.uploaded_by = u.user_id
-                    ORDER BY f.upload_time DESC
+                        file_id,
+                        file_name,
+                        uploaded_by_username AS uploaded_by,
+                        countries,
+                        departments,
+                        upload_time
+                    FROM files
+                    ORDER BY upload_time DESC
                 """)
             files = cursor.fetchall()
             # Convert bytes/None to string/list as needed
@@ -826,7 +1003,7 @@ async def get_files(current_user: dict = Depends(get_current_user)):
     finally:
         conn.close()
 
-
+        
 @app.get("/list-files", response_model=List[str])
 def list_files():
     folder_path = Path(__file__).resolve().parent.parent / "pipeline" / "data" / "raw_data"
@@ -905,41 +1082,36 @@ async def get_logs(
             "table": "chatbot_logs",
             "columns": ["log_id", "user", "conversation_id", "query", "response", "created_at"],
             "sql": """
-                SELECT l.log_id, u.username AS user, l.conversation_id, l.query, l.response, l.created_at
-                FROM chatbot_logs l
-                LEFT JOIN users u ON l.user_id = u.user_id
-                ORDER BY l.log_id DESC
+                SELECT log_id, username AS user, conversation_id, query, response, created_at
+                FROM chatbot_logs
+                ORDER BY log_id DESC
             """
         },
         "login_logs": {
             "table": "login_logs",
             "columns": ["log_id", "user", "login_time", "status"],
             "sql": """
-                SELECT l.log_id, u.username AS user, l.login_time, l.status
-                FROM login_logs l
-                LEFT JOIN users u ON l.user_id = u.user_id
-                ORDER BY l.log_id DESC
+                SELECT log_id, username AS user, login_time, status
+                FROM login_logs
+                ORDER BY log_id DESC
             """
         },
         "upload_user_logs": {
             "table": "upload_user_logs",
             "columns": ["log_id", "user", "created_user", "timestamp"],
             "sql": """
-                SELECT l.log_id, u1.username AS user, u2.username AS created_user, l.timestamp
-                FROM upload_user_logs l
-                LEFT JOIN users u1 ON l.user_id = u1.user_id
-                LEFT JOIN users u2 ON l.created_user_id = u2.user_id
-                ORDER BY l.log_id DESC
+                SELECT log_id, username AS user, created_username AS created_user, timestamp
+                FROM upload_user_logs
+                ORDER BY log_id DESC
             """
         },
         "upload_file_logs": {
             "table": "upload_file_logs",
             "columns": ["uploaded_by_username", "file_name", "department", "countries", "departments", "upload_time"],
             "sql": """
-                SELECT u.username AS uploaded_by_username, f.file_name, f.department, f.countries, f.departments, f.upload_time
-                FROM upload_file_logs f
-                LEFT JOIN users u ON f.uploaded_by = u.user_id
-                ORDER BY f.upload_time DESC
+                SELECT uploaded_by_username, file_name, department, countries, departments, upload_time
+                FROM upload_file_logs
+                ORDER BY upload_time DESC
             """
         },
         "file_deletion_logs": {
@@ -989,12 +1161,11 @@ async def get_logs(
         },
         "password_reset_tokens": {
             "table": "password_reset_tokens",
-            "columns": ["user", "token_hash", "expires_at", "created_at"],
+            "columns": ["user", "username", "token_hash", "expires_at", "created_at"],
             "sql": """
-                SELECT u.username AS user, t.token_hash, t.expires_at, t.created_at
-                FROM password_reset_tokens t
-                LEFT JOIN users u ON t.user_id = u.user_id
-                ORDER BY t.created_at DESC
+                SELECT username AS user, token_hash, expires_at, created_at
+                FROM password_reset_tokens
+                ORDER BY created_at DESC
             """
         },
     }
@@ -1082,9 +1253,9 @@ def login_user(user: UserLogin, request: Request):
 
             # Log successful login
             cursor.execute("""
-                INSERT INTO login_logs (user_id, status)
-                VALUES (%s, %s)
-                """, (user_id, status))
+                INSERT INTO login_logs (user_id, username, status)
+                VALUES (%s, %s, %s)
+                """, (user_id, user_record["username"], status))
 
             db.commit()
             return {"access_token": token, "token_type": "bearer"}
@@ -1093,11 +1264,12 @@ def login_user(user: UserLogin, request: Request):
             # Log failed login (if user exists or not)
             if user_record:
                 user_id = user_record["user_id"]
+                username = user_record["username"]
 
             cursor.execute("""
-                INSERT INTO login_logs (user_id, status)
-                VALUES (%s, %s)
-                """, (user_id, status))
+                INSERT INTO login_logs (user_id, username, status)
+                VALUES (%s, %s, %s)
+                """, (user_id, username, status))
 
             db.commit()
             raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -1151,15 +1323,15 @@ async def log_conversation(
                 chat_title = generate_chat_title(log.query)
                 
             sql = """
-                INSERT INTO chatbot_logs (user_id, conversation_id, query, response{title_col})
-                VALUES (%s, %s, %s, %s{title_val})
+                INSERT INTO chatbot_logs (user_id, username, conversation_id, query, response{title_col})
+                VALUES (%s, %s, %s, %s, %s{title_val})
             """
             if chat_title:
                 sql = sql.format(title_col=", title", title_val=", %s")
-                params = (current_user["user_id"], log.conversation_id or str(uuid.uuid4()), log.query, log.response, chat_title)
+                params = (current_user["user_id"], current_user["username"], log.conversation_id or str(uuid.uuid4()), log.query, log.response, chat_title)
             else:
                 sql = sql.format(title_col="", title_val="")
-                params = (current_user["user_id"], log.conversation_id or str(uuid.uuid4()), log.query, log.response)
+                params = (current_user["user_id"], current_user["username"], log.conversation_id or str(uuid.uuid4()), log.query, log.response)
 
             cursor.execute(sql, params)
         conn.commit()
@@ -1248,9 +1420,9 @@ async def upload_xlsx(
 
                 created_user_id = cursor.lastrowid
                 cursor.execute("""
-                    INSERT INTO upload_user_logs (user_id, created_user_id)
-                    VALUES (%s, %s)
-                    """, (current_user["user_id"], created_user_id))
+                    INSERT INTO upload_user_logs (user_id, username, created_user_id, created_username)
+                    VALUES (%s, %s, %s, %s)
+                    """, (current_user["user_id"], current_user["username"], created_user_id, username))
 
             except pymysql.err.IntegrityError:
                 continue  # Skip duplicate entries
@@ -1305,36 +1477,46 @@ async def upload_file(
         conn = get_db()
         try:
             with conn.cursor() as cursor:
-                # Get user ID - FIXED: use user_id column
+                # Get user ID
                 cursor.execute("SELECT user_id FROM users WHERE username = %s", (current_user.get("username"),))
                 user_result = cursor.fetchone()
                 user_id = user_result["user_id"] if user_result else 1
                 
                 # Insert into files table
                 cursor.execute("""
-                    INSERT INTO files (file_name, file_type, uploaded_by, department, access_level, file_path, 
-                                     countries, departments, upload_time)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO files (file_name, file_type, uploaded_by, uploaded_by_username, department, access_level, file_path, 
+                                    countries, departments, batch_id, upload_time)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     file.filename,
                     file_path.suffix.lstrip(".").lower(),
                     user_id,
+                    current_user.get("username"),
                     ",".join(departments_list),
                     "FILTERED",
                     str(file_path),
                     ",".join(countries_list),
                     ",".join(departments_list),
+                    None,  # batch_id is None for single upload
                     datetime.now()
                 ))
                 
                 # INSERT INTO upload_file_logs table
                 cursor.execute("""
-                    INSERT INTO upload_file_logs (user_id, username, filename)
-                    VALUES (%s, %s, %s)
+                    INSERT INTO upload_file_logs (file_name, file_type, uploaded_by, uploaded_by_username, department, access_level, file_path, countries, departments, batch_id, upload_time)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
+                    file.filename,
+                    file_path.suffix.lstrip(".").lower(),
                     user_id,
                     current_user.get("username"),
-                    file.filename
+                    ",".join(departments_list),
+                    "FILTERED",
+                    str(file_path),
+                    ",".join(countries_list),
+                    ",".join(departments_list),
+                    None,  # batch_id is None for single upload
+                    datetime.now()
                 ))
                 
                 conn.commit()
@@ -1409,13 +1591,14 @@ async def batch_upload_files(
                         
                         # Insert into files table
                         cursor.execute("""
-                            INSERT INTO files (file_name, file_type, uploaded_by, department, access_level, file_path, 
+                            INSERT INTO files (file_name, file_type, uploaded_by, uploaded_by_username, department, access_level, file_path, 
                                              countries, departments, batch_id, upload_time)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, (
                             file.filename,
                             file_path.suffix.lstrip(".").lower(),
                             user_id,
+                            current_user.get("username"),
                             ",".join(departments_list),
                             "FILTERED",
                             str(file_path),
@@ -1427,12 +1610,20 @@ async def batch_upload_files(
                         
                         # INSERT INTO upload_file_logs table
                         cursor.execute("""
-                            INSERT INTO upload_file_logs (user_id, username, filename)
-                            VALUES (%s, %s, %s)
+                            INSERT INTO upload_file_logs (file_name, file_type, uploaded_by, uploaded_by_username, department, access_level, file_path, countries, departments, batch_id, upload_time)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, (
+                            file.filename,
+                            file_path.suffix.lstrip(".").lower(),
                             user_id,
                             current_user.get("username"),
-                            file.filename
+                            ",".join(departments_list),
+                            "FILTERED",
+                            str(file_path),
+                            ",".join(countries_list),
+                            ",".join(departments_list),
+                            batch_id,
+                            datetime.now()
                         ))
                         
                         conn.commit()
@@ -2262,15 +2453,15 @@ async def forgot_password(request: PasswordResetRequest, req: Request):
             # Store reset token in database (expires in 1 hour)
             expire_time = datetime.now() + timedelta(hours=1)
             cursor.execute("""
-                INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
-                VALUES (%s, %s, %s)
+                INSERT INTO password_reset_tokens (user_id, username, token_hash, expires_at)
+                VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE token_hash = %s, expires_at = %s
-            """, (user["user_id"], reset_token_hash, expire_time, reset_token_hash, expire_time))
-            
+            """, (user["user_id"], user["username"], reset_token_hash, expire_time, reset_token_hash, expire_time))
+
             conn.commit()
             
             # Create reset link
-            reset_link = f"http://localhost:3000/reset-password?token={reset_token}&user_id={user['user_id']}"
+            reset_link = f"http://{REMOTE_IP}:3000/reset-password?token={reset_token}&user_id={user['user_id']}"
             
             # Email content
             subject = "Password Reset Request - Verztec HR System"

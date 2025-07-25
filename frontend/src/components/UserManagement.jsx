@@ -1,6 +1,7 @@
 import { Search, ChevronUp, ChevronDown, MoreVertical, X, RefreshCw, Filter } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from "react-dom";
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 const ALL_DEPARTMENTS = [
   "Marketing","Procurement","IT","Project Management","Human Resource","Admin & Operations","Business Development","Finance","Service Delivery"
@@ -359,7 +360,7 @@ export default function UserManagement({ isDarkMode, currentUser }) {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/users', {
+      const response = await fetch(`http://${remoteip}:8000/users`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -479,7 +480,7 @@ export default function UserManagement({ isDarkMode, currentUser }) {
   const handleEditSave = async (updatedUser) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/users/${updatedUser.user_id}`, {
+      const response = await fetch(`http://${remoteip}:8000/users/${updatedUser.user_id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -510,7 +511,7 @@ export default function UserManagement({ isDarkMode, currentUser }) {
     console.log("Sending batch update payload:", payload);
     
     try {
-      const res = await fetch('http://localhost:8000/users/batch-update', {
+      const res = await fetch(`http://${remoteip}:8000/users/batch-update`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -572,7 +573,7 @@ export default function UserManagement({ isDarkMode, currentUser }) {
     if (window.confirm(`Are you sure you want to reset the password for ${user.username}? They will receive a temporary password via email.`)) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:8000/reset-password/${user.user_id}`, {
+        const response = await fetch(`http://${remoteip}:8000/reset-password/${user.user_id}`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -742,7 +743,7 @@ export default function UserManagement({ isDarkMode, currentUser }) {
                   if (!window.confirm(`Are you sure you want to delete ${selectedRows.length} selected users? This cannot be undone.`)) return;
                   const token = localStorage.getItem('token');
                   try {
-                    const res = await fetch('http://localhost:8000/users/batch-delete', {
+                    const res = await fetch(`http://${remoteip}:8000/users/batch-delete`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                       body: JSON.stringify({ user_ids: selectedRows }),
@@ -1114,7 +1115,7 @@ export default function UserManagement({ isDarkMode, currentUser }) {
                   setDeleting(true);
                   try {
                     const token = localStorage.getItem('token');
-                    const response = await fetch(`http://localhost:8000/users/${deleteUser.user_id}`, {
+                    const response = await fetch(`http://${remoteip}:8000/users/${deleteUser.user_id}`, {
                       method: 'DELETE',
                       headers: {
                         Authorization: `Bearer ${token}`,

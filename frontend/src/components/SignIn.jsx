@@ -2,7 +2,7 @@ import { useState } from 'react';
 import logo from '@/assets/images/logo.svg';
 import background from '@/assets/images/background.png';
 import Toast from './Toast';
-
+const remoteip = import.meta.env.VITE_REMOTE_IP  // Environment variable
 function SignIn({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,7 +21,7 @@ function SignIn({ onLogin }) {
     e.preventDefault();
 
     try {
-      const response = await fetch('http://localhost:8000/login', {
+      const response = await fetch(`http://${remoteip}:8000/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -42,7 +42,7 @@ function SignIn({ onLogin }) {
       localStorage.setItem('token', token);
 
       // Optional: Fetch profile info
-      const profileRes = await fetch('http://localhost:8000/profile', {
+      const profileRes = await fetch(`http://${remoteip}:8000/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -67,7 +67,7 @@ function SignIn({ onLogin }) {
     setForgotPasswordLoading(true);
     
     try {
-      const response = await fetch('http://localhost:8000/forgot-password', {
+      const response = await fetch(`http://${remoteip}:8000/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -173,7 +173,7 @@ function SignIn({ onLogin }) {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                     />
                   </svg>
                 </div>
@@ -246,7 +246,7 @@ function SignIn({ onLogin }) {
           </div>
         )}
 
-        <style jsx>{`
+        <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
         `}</style>
       </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { UploadCloud, Download, ChevronDown, ChevronUp, FileSpreadsheet } from 'lucide-react';
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 export default function UploadXlsxButton() {
   const [file, setFile] = useState(null);
@@ -26,7 +27,7 @@ export default function UploadXlsxButton() {
       }
       
       try {
-        const res = await axios.get('http://localhost:8000/profile', {
+        const res = await axios.get(`http://${remoteip}:8000/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUser(res.data.session);
@@ -60,7 +61,7 @@ export default function UploadXlsxButton() {
     
     try {
       console.log('Fetching users...');
-      const res = await axios.get('http://localhost:8000/users', {
+      const res = await axios.get(`http://${remoteip}:8000/users`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -122,7 +123,7 @@ export default function UploadXlsxButton() {
     }
     
     try {
-      const response = await axios.post('http://localhost:8000/upload-xlsx', formData, {
+      const response = await axios.post(`http://${remoteip}:8000/upload-xlsx`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`,
@@ -194,7 +195,7 @@ export default function UploadXlsxButton() {
               Use this Excel form to upload users in bulk.
             </div>
             <a
-              href="http://localhost:8000/static/Adding%20Users.xlsx"
+              href={`http://${remoteip}:8000/static/Adding%20Users.xlsx`}
               download
               className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition-colors"
             >

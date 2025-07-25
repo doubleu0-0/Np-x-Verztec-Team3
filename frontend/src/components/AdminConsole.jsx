@@ -27,6 +27,7 @@ const LOG_TABS = [
   { key: "password_reset_audit", label: "Password Reset Audit" },
   { key: "password_reset_tokens", label: "Password Reset Tokens" },
 ];
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 const AdminSidebar = ({
   activeTab,
@@ -244,7 +245,7 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
     const token = localStorage.getItem('token');
     if (token) {
       try {
-        await fetch('http://localhost:8000/logout', {
+        await fetch(`http://${remoteip}:8000/logout`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,

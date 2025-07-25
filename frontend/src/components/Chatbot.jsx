@@ -6,6 +6,7 @@ import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
 import ModelSelector from '@/components/ModelSelector';
 import { useTTS } from '@/contexts/TTSContext';
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 function Chatbot({
   userProfile,
@@ -19,11 +20,10 @@ function Chatbot({
 }) {
   const [messages, setMessages] = useImmer([]);
   const [newMessage, setNewMessage] = useState('');
-  const [status, setStatus] = useState('');
+  const [processingState, setProcessingState] = useState(null); // Replace status with processingState
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [loadingLog, setLoadingLog] = useState(false);
   const messagesEndRef = useRef(null);
-  // const [conversationId, setConversationId] = useState(null);
 
   const isLoading = messages.length && messages[messages.length - 1].loading;
   const { speakText } = useTTS();
@@ -40,7 +40,7 @@ function Chatbot({
 
     if (selectedLogId === null) {
       setMessages([]);
-      setStatus('');
+      setProcessingState(null); // Clear processing state
     }
   }, [selectedLogId]);
 
@@ -60,11 +60,6 @@ function Chatbot({
     const trimmedMessage = newMessage.trim();
     if (!trimmedMessage || isLoading) return;
 
-    // if (messages.length === 0 && onNewChatCreated) {
-    //   const newId = crypto.randomUUID();
-    //   setConversationId(newId);
-    //   onNewChatCreated(newId);
-    // }
     let finalConversationId = conversationId;
     if (!finalConversationId) {
       finalConversationId = crypto.randomUUID();
@@ -74,17 +69,20 @@ function Chatbot({
       }
     }
 
-
     setMessages(draft => {
       draft.push({ role: 'user', content: trimmedMessage });
     });
 
     setNewMessage('');
-    setStatus("Processing your message...");
+    setProcessingState('processing'); // Show processing animation
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:8000/process', {
+      
+      // Add a small delay to show the processing animation
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const res = await fetch(`http://${remoteip}:8000/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,6 +100,11 @@ function Chatbot({
       let parsedQuestions = [];
 
       if (contentType && contentType.includes("application/json")) {
+        setProcessingState('extracting'); // Show extracting animation
+        
+        // Add delay to show extracting animation
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         let text = "";
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -115,19 +118,46 @@ function Chatbot({
         try {
           data = JSON.parse(text);
         } catch (e) {
-          setStatus("✗ Error: Invalid JSON from server.");
+          setProcessingState(null);
           return;
         }
         parsedQuestions = data.questions || [];
+        const originalMessage = data.original_message;
 
         if (parsedQuestions.length === 0) {
-          setStatus("No HR-related questions found.");
+          setProcessingState(null);
           setMessages(draft => {
             draft.push({ role: 'assistant', content: "I'm here to help with HR-related concerns like leave, policies, or claims!" });
           });
           return;
         }
+
+        setProcessingState('searching'); // Show searching animation
+        
+        // Add delay to show searching animation
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        
+        const assistantIndexes = [];
+        setMessages(draft => {
+          parsedQuestions.forEach(() => {
+            const index = draft.length;
+            draft.push({ role: 'assistant', content: '', loading: true });
+            assistantIndexes.push(index);
+          });
+        });
+
+        setProcessingState(null); // Clear processing state when messages start loading
+        parsedQuestions.forEach((q, i) => {
+          setTimeout(() => {
+            streamAnswer(q, assistantIndexes[i], originalMessage);
+          }, 0);
+        });
       } else {
+        setProcessingState('generating'); // Show generating animation
+        
+        // Add delay to show generating animation
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
         let text = "";
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -138,6 +168,8 @@ function Chatbot({
           assistantIndex = draft.length;
           draft.push({ role: 'assistant', content: '', loading: true });
         });
+
+        setProcessingState(null); // Clear processing state when streaming starts
 
         while (!done) {
           const { value, done: doneReading } = await reader.read();
@@ -156,45 +188,29 @@ function Chatbot({
           const finalResponse = draft[assistantIndex].content;
           speakText(finalResponse);
         });
-        setStatus("");
         return;
       }
 
-      setStatus(`Extracted ${parsedQuestions.length} question(s).`);
-      const assistantIndexes = [];
-      setMessages(draft => {
-        parsedQuestions.forEach(() => {
-          const index = draft.length;
-          draft.push({ role: 'assistant', content: '', loading: true });
-          assistantIndexes.push(index);
-        });
-      });
-
-      parsedQuestions.forEach((q, i) => {
-        setTimeout(() => {
-          streamAnswer(q, assistantIndexes[i]);
-        }, 0);
-      });
-
     } catch (err) {
-      setStatus(`✗ Error: ${err.message}`);
+      setProcessingState(null);
+      // Could add an error state here if needed
     }
   }
 
-  async function streamAnswer(questionText, assistantIndex) {
+  async function streamAnswer(questionText, assistantIndex, originalMessage) {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:8000/stream', {
+      const res = await fetch(`http://${remoteip}:8000/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        // body: JSON.stringify({ message: questionText, model: selectedModel })
         body: JSON.stringify({
           message: questionText,
           model: selectedModel,
-          conversation_id: conversationId   // ✅ add this line
+          conversation_id: conversationId,
+          original_message: originalMessage
         }),
      });
 
@@ -221,9 +237,7 @@ function Chatbot({
         draft[assistantIndex].loading = false;
       });
 
-      setStatus("Done :)");
     } catch (err) {
-      setStatus(`✗ Stream error: ${err.message}`);
       setMessages(draft => {
         if (!draft[assistantIndex]) return;
         draft[assistantIndex].loading = false;
@@ -243,8 +257,8 @@ function Chatbot({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-4 pt-6 min-h-0">
-        {messages.length === 0 ? (
+      <div className='flex-1 overflow-y-auto min-h-0 space-y-4 p-4'>
+        {messages.length === 0 && !processingState ? (
           <>
             <div className="flex flex-col items-center mb-6">
               <img src={isDarkMode ? white_logo : logo} className="w-32 mb-2" alt="logo" />
@@ -255,25 +269,27 @@ function Chatbot({
             <div className="font-urbanist text-primary-blue text-xl font-light space-y-2 text-center">
               <p>👋 Hi there!</p>
               <p>
-                I’m your AI assistant here at Verztec, think of me as your go-to guide for all things work and HR. From office policies to pantry rules, I’m here 24/7 to help you navigate your workday with ease.
+                I'm your AI assistant here at Verztec, think of me as your go-to guide for all things work and HR. From office policies to pantry rules, I'm here 24/7 to help you navigate your workday with ease.
               </p>
-              <p>Whenever you’re ready, I’m here to help.</p>
+              <p>Whenever you're ready, I'm here to help.</p>
             </div>
           </>
         ) : (
-          <ChatMessages messages={messages} isLoading={isLoading} />
+          <ChatMessages 
+            messages={messages} 
+            isLoading={isLoading} 
+            processingState={processingState}
+          />
         )}
         <div ref={messagesEndRef} />
       </div>
 
       <ChatInput
         newMessage={newMessage}
-        isLoading={isLoading}
+        isLoading={isLoading || processingState !== null}
         setNewMessage={setNewMessage}
         submitNewMessage={submitNewMessage}
       />
-
-      <div className="text-sm text-gray-500 px-4 py-2">{status}</div>
     </div>
   );
 }

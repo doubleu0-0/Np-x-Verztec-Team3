@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MessageSquare, Star, Bug, Lightbulb, Eye, Check, Clock, AlertCircle, Search, Filter, ChevronDown, ChevronUp } from 'lucide-react';
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 const ViewFeedback = () => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -30,7 +31,7 @@ const ViewFeedback = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://localhost:8000/api/feedback', {
+      const response = await fetch(`http://${remoteip}:8000/api/feedback`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -61,7 +62,7 @@ const ViewFeedback = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://localhost:8000/api/feedback/${id}/status', {
+      const response = await fetch(`http://${remoteip}:8000/api/feedback/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

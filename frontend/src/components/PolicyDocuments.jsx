@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { ChevronUp, ChevronDown, MoreVertical, X, Filter, Loader, Search, RefreshCw } from 'lucide-react';
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 const ALL_DEPARTMENTS = [
   "Marketing","Procurement","IT","Project Management","Human Resource","Admin & Operations","Business Development","Finance","Service Delivery"
@@ -212,7 +213,7 @@ export default function PolicyDocuments({ currentUser }) {
     setLoading(true);
     const token = localStorage.getItem('token');
     try {
-      const res = await axios.get('http://localhost:8000/files', {
+      const res = await axios.get(`http://${remoteip}:8000/files`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setFileList(res.data);
@@ -312,7 +313,7 @@ export default function PolicyDocuments({ currentUser }) {
     if (!window.confirm(`Are you sure you want to delete "${file.file_name}"? This cannot be undone.`)) return;
     const token = localStorage.getItem('token');
     try {
-      await axios.delete(`http://localhost:8000/delete-file/${encodeURIComponent(file.file_name)}`, {
+      await axios.delete(`http://${remoteip}:8000/delete-file/${encodeURIComponent(file.file_name)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchFileList(); // Refresh the list after deletion
@@ -344,7 +345,7 @@ export default function PolicyDocuments({ currentUser }) {
       countries.forEach(country => form.append("countries", country));
 
       await axios.put(
-        `http://localhost:8000/update-file/${encodeURIComponent(updatedFile.file_name)}`,
+        `http://${remoteip}:8000/update-file/${encodeURIComponent(updatedFile.file_name)}`,
         form,
         {
           headers: {
@@ -754,7 +755,7 @@ export default function PolicyDocuments({ currentUser }) {
                   setDeleting(true);
                   const token = localStorage.getItem('token');
                   try {
-                    await axios.delete(`http://localhost:8000/delete-file/${encodeURIComponent(deleteFile.file_name)}`, {
+                    await axios.delete(`http://${remoteip}:8000/delete-file/${encodeURIComponent(deleteFile.file_name)}`, {
                       headers: { Authorization: `Bearer ${token}` }
                     });
                     setDeleteFile(null);

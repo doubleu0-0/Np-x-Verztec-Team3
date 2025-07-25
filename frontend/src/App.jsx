@@ -50,6 +50,7 @@ const avatarNames = {
   avatar6: "Her"
 };
 
+const remoteip = import.meta.env.VITE_REMOTE_IP
 function AppContent({ selectedAvatar, setSelectedAvatar }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -70,7 +71,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
   const [markdownContent, setMarkdownContent] = useState('');
   const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [selectedChatMessages, setSelectedChatMessages] = useState([]);
-  const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
+  const [conversationId, setConversationId] = useState(() => uuidv4());
   
   const modelDropdownRef = useRef(null);
 
@@ -85,7 +86,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
   const loadChats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/chat-history/titles', {
+      const response = await fetch(`http://${remoteip}:8000/chat-history/titles`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -150,7 +151,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
   };
 
   const handleNewChat = async () => {
-    const newId = crypto.randomUUID();
+    const newId = uuidv4();
     setConversationId(newId);
     setSelectedLogId(newId);
     setSelectedChatMessages([]);
@@ -162,7 +163,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
   const loadChatMessages = async (conversation_id) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/chat-history/${conversation_id}`, {
+      const response = await fetch(`http://${remoteip}:8000/chat-history/${conversation_id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -183,7 +184,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
 
   const handleLogin = async (email) => {
     const token = localStorage.getItem('token');
-    const profileRes = await fetch('http://localhost:8000/profile', {
+    const profileRes = await fetch(`http://${remoteip}:8000/profile`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const profileData = await profileRes.json();
@@ -195,7 +196,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
     const token = localStorage.getItem('token');
     if (token) {
       try {
-        await fetch('http://localhost:8000/logout', {
+        await fetch(`http://${remoteip}:8000/logout`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -234,7 +235,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/chat-history/${conversation_id}`, {
+      const response = await fetch(`http://${remoteip}:8000/chat-history/${conversation_id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
     if (response.ok) {
@@ -688,3 +689,11 @@ function App() {
 }
 
 export default App;
+
+function uuidv4() {
+  // RFC4122 version 4 compliant UUID generator
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}

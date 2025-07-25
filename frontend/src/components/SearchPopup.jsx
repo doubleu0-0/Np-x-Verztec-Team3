@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react"; // added useRef to detect clicks outside popup for closing it
 import axios from "axios";
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onChatSelect
   const [query, setQuery] = useState("");
@@ -55,7 +56,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get("http://localhost:8000/search?q=", {
+      const res = await axios.get(`http://${remoteip}:8000/search?q=`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -72,7 +73,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`http://localhost:8000/search?q=${searchTerm}`, {
+      const res = await axios.get(`http://${remoteip}:8000/search?q=${searchTerm}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

@@ -31,6 +31,7 @@ const DATE_COLUMNS = [
   "expired_at",
   "updated_at",
 ];
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 export default function DatabaseLogs({ isDarkMode, activeLogTab }) {
   const [logs, setLogs] = useState({ columns: [], rows: [] });
@@ -67,7 +68,7 @@ export default function DatabaseLogs({ isDarkMode, activeLogTab }) {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:8000/logs/${tab}`, {
+      const res = await fetch(`http://${remoteip}:8000/logs/${tab}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
