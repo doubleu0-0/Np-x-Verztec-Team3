@@ -1,3 +1,5 @@
+# Create Virtual Environment Manually First
+
 # Getting the root directory
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
@@ -26,7 +28,7 @@ ollama pull llama3.2:1b
 
 # Starting Redis server
 Write-Host "Starting Redis server..."
-Start-Process -NoNewWindow -FilePath "$RedisPath\redis-server.exe" -ArgumentList "--port 6380"
+Start-Process -NoNewWindow -FilePath "$RedisPath\redis-server.exe" -ArgumentList "--port 6381"
 
 # Starting FastAPI backend
 Write-Host "Starting FastAPI backend..."
