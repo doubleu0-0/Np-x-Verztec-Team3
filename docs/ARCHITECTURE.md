@@ -4,7 +4,7 @@ The system is composed of these primary services that communicate internally:
 
 ![Architecture Diagram](../docs/Architecture.png)
 
-## Summarised Key Flows
+## 🔃 Summarised Key Flows
 
 ```plaintext
 1. User Interaction
