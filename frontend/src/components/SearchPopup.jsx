@@ -1,18 +1,18 @@
-import { useState, useEffect, useRef } from "react"; // added useRef to detect clicks outside popup for closing it
+import { useState, useEffect, useRef } from "react"; 
 import axios from "axios";
 
-const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onChatSelect
+const SearchPopup = ({ isOpen, onClose, onChatSelect }) => { 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [typingTimeout, setTypingTimeout] = useState(null);
-  const [loading, setLoading] = useState(false); // 🔍 For spinner state while loading search results
-  const popupRef = useRef(null); // used to track popup container for detecting outside clicks
+  const [loading, setLoading] = useState(false); 
+  const popupRef = useRef(null); 
   const firstMatchRef = useRef(null);
 
-  // Simple highlight function for user query text (returns html string)
+  // Highlight function for user query text
   const highlightQuery = (text, keyword) => {
     if (!keyword.trim()) return text;
-    const words = keyword.trim().toLowerCase().split(/\s+/);6
+    const words = keyword.trim().toLowerCase().split(/\s+/);
     let highlighted = text;
 
     words.forEach((word) => {
@@ -33,7 +33,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     }
   }, [isOpen, query]);
 
-  // Added this useEffect to close popup when user clicks outside of it kinda expected UX nowadays i think?
+  // Added this useEffect to close popup when user clicks outside the popup
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (event) => {
@@ -43,9 +43,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
       }
     };
     
-    // Listen globally for clicks
     document.addEventListener("mousedown", handleClickOutside);
-    // Clean up the listener when popup closes or unmounts
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
@@ -97,7 +95,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     setLoading(false);
   };  
 
-  // Debounced input handler for search input box like for that automatic search-as-you-type experience
+  // Debounced input handler for automatic search-as-you-type experience
   const handleInputChange = (e) => {
     const value = e.target.value;
     setQuery(value);
@@ -112,7 +110,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     setTypingTimeout(timeout);
   };
 
-  // Clear input handler — resets query and reloads recent chats
+  // Clear input handler which resets query and reloads recent chats
   const handleClearInput = () => {
     setQuery("");
     fetchRecentChats();
@@ -120,7 +118,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
 
   const handleChatClick = (conversationId) => {
     if (onChatSelect) {
-      onChatSelect(conversationId);  // Pass conversation_id, not log_id
+      onChatSelect(conversationId);  
     } else {
       onClose();
     }
@@ -257,12 +255,12 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      {/* Ref attached here so we can detect outside clicks for closing the popup */}
+      {/* Detect outside clicks for closing the popup */}
       <div
         ref={popupRef}
         className="bg-gray-100 dark:bg-gray-800 p-6 rounded-2xl w-full max-w-2xl h-[600px] shadow-xl flex flex-col"
       >
-        {/* Header with title and explicit close button (kept it cus its pretty standard for clarity and accessibility) */}
+        {/* Header with title and close button */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Search Chats</h2>
           <button
@@ -297,7 +295,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
           {query ? "Results" : "Chats in the last 30 days"}
         </div>
 
-        {/* The results list itself, scrollable with nice scrollbar styling */}
+        {/* Scrollable results list */}
         <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
           {results.map((chat, index) => {
             if (!chat.preview || !chat.preview.trim()) return null;
