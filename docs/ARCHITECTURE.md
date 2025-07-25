@@ -8,7 +8,7 @@ The system is composed of these primary services that communicate internally:
 
 ```plaintext
 1. User Interaction
-   User → React + Vite → Prompt → FastAPI → LLaMA → ChromaDB → LLaMA → Response → FastAPI → React + Vite → User
+   User → Frontend → Prompt → LLaMA → ChromaDB → LLaMA → Response → Frontend → User
 
 2. File Upload by Manager/Admin
    Manager/Admin → Upload File → Processing Pipeline → ChromaDB
