@@ -22,13 +22,21 @@ Lunar AI is an intelligent assistant designed to **free up employees’ time** b
 ## 📁 Key Project Structure
 
 root/
+
 ├── backend/ # FastAPI app logic
+
 ├── frontend/ # Vite + React frontend (avatar and UI)
-├── pipeline/ # Data preprocessing
+
+├── pipeline/ # File processing
+
 ├── docs/ # System documentation and handover notes
+
 ├── SQL/ # SQL scripts for table creation
+
 ├── .env.example # Template for required environment variables
+
 ├── start-all.ps1 # Powershell startup script
+
 └── README.md # This file
 
 ---
@@ -66,6 +74,7 @@ cd Np-x-Verztec-Team3
 - Copy .env.example and rename it to .env. Fill in the required values.
 
 ### 4. Set Up Python Virtual Environment
+- Run the following commands in a PowerShell terminal
 ```powershell
 cd backend
 
@@ -80,6 +89,7 @@ Get-Command python
 ```
 
 ### 5. Start the Entire Stack
+- Open a new Powershell terminal and run the following command
 ```powershell
-Run '.\start-all.ps1'
+.\start-all.ps1
 ```
