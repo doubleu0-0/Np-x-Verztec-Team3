@@ -26,7 +26,7 @@ ollama pull llama3.2:1b
 
 # Starting Redis server
 Write-Host "Starting Redis server..."
-Start-Process -NoNewWindow -FilePath "$RedisPath\redis-server.exe" -ArgumentList "--port 6381"
+Start-Process -NoNewWindow -FilePath "$RedisPath\redis-server.exe" -ArgumentList "--port 6380"
 
 # Starting FastAPI backend
 Write-Host "Starting FastAPI backend..."
