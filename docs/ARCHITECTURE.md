@@ -1,28 +1,28 @@
 # System Architecture
   
-The system is composed of three primary services that communicate internally:
+The system is composed of these primary services that communicate internally:
 
-![Architecture Diagram](../docs/architecture.png)
+![Architecture Diagram](../docs/Architecture.png)
 
-## Component Breakdown
-
-### 1. Frontend (Vite + React)
-- Hosts the user interface
-- Sends REST API requests to the backend
-- Displays translated chatbot responses and sentiment outputs
-
-### 2. Backend (FastAPI)
-- Receives frontend requests
-- Performs user authentication
-- Passes natural language prompts to the `pipeline/` module
-
-### 3. Pipeline
-- Loads and caches the LLaMA model via Ollama
-- Embeds queries and performs FAISS similarity search
-- Classifies sentiment and manages translations (via Argos Translate)
-- Uses Redis for caching expensive operations
-
-## Data Flow Summary
+## Summarised Key Flows
 
 ```plaintext
-User → React → FastAPI → Pipeline → Ollama / FAISS / Redis → Response → React UI
+1. User Interaction
+   User → React + Vite → Prompt → FastAPI → LLaMA → ChromaDB → LLaMA → Response → FastAPI → React + Vite → User
+
+2. File Upload by Manager/Admin
+   Manager/Admin → Upload File → Processing Pipeline → ChromaDB
+
+3. User Actions Logging
+   User → Perform Action → Log Event → MySQL
+
+4. Authentication Flow
+   User Login → MySQL (Persistent Logging) → Redis (Session Cache)
+
+5. Optional Features
+   a. Speech-to-Text:  
+      User → Microphone Input → Whisper → Text Prompt
+
+   b. Translation of Replies:  
+      Response → ArgosTranslate → Translated Response → User
+```
