@@ -53,7 +53,7 @@ export const TTSProvider = ({ children, selectedAvatar }) => {
     const speakWithVoice = () => {
       const voices = speechSynthesis.getVoices();
 
-      const trimmedContent = text.split("Evaluating")[0];
+      const trimmedContent = text.split("Evaluating citations...")[0];
       if (trimmedContent.trim().length === 0) return;
 
       const preferredVoiceName = avatarVoiceMap[selectedAvatar];
