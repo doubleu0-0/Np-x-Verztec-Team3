@@ -6,7 +6,7 @@ Lunar AI is an intelligent assistant designed to **free up employees’ time** b
 
 ---
 
-## Tech Stack
+## 🧰 Tech Stack
 
 | Component        | Technology                     |
 |------------------|--------------------------------|
