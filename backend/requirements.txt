@@ -18,3 +18,4 @@ redis
 git+https://github.com/openai/whisper.git
 chromadb
 llama-index-vector-stores-chroma
+argostranslate

@@ -8,12 +8,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useTTS } from '@/contexts/TTSContext';
 const remoteip = import.meta.env.VITE_REMOTE_IP
 
-function ChatMessages({ messages, isLoading, processingState = null }) {
+function ChatMessages({ messages, isLoading, processingState = null, shouldSpeak }) {
   const bottomRef = useRef(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const { speakText } = useTTS();
+  const { speakText } = useTTS(); // Get the speakText function from context
 
-  // --- Fun Fact State (lifted up) ---
+  // List of fun facts
   const funFacts = [
     "Did you know? Verztec employees find it difficult to to read with their eyes closed",
     "Fun fact: Everytime a child is born the population increases",
@@ -98,8 +98,9 @@ function ChatMessages({ messages, isLoading, processingState = null }) {
     }
   }, [messages, processingState]);
 
+  // Use the TTS context instead of direct speechSynthesis
   useEffect(() => {
-    if (!messages.length) return;
+    if (!messages.length || !shouldSpeak) return;
     const last = messages[messages.length - 1];
 
     if (last.role === 'assistant' && last.content && !last.loading) {
@@ -107,8 +108,9 @@ function ChatMessages({ messages, isLoading, processingState = null }) {
       const cleanContent = last.content.replace('__EMPTY_RESPONSE_METADATA__', '').trim();
       speakText(cleanContent);
     }
-  }, [messages, speakText]);
+  }, [messages, speakText, shouldSpeak]);
 
+  // Check for dark mode
   useEffect(() => {
     const checkDark = () => setIsDarkMode(document.documentElement.classList.contains('dark'));
     checkDark();
@@ -117,7 +119,7 @@ function ChatMessages({ messages, isLoading, processingState = null }) {
     return () => observer.disconnect();
   }, []);
 
-  // --- RotatingLoadingMessage (NO fun fact logic here anymore) ---
+  // --- RotatingLoadingMessage (NO fun fact logic here) ---
   const RotatingLoadingMessage = ({ messages, color = "green" }) => {
     const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
@@ -160,8 +162,7 @@ function ChatMessages({ messages, isLoading, processingState = null }) {
     );
   };
 
-
-  // Add the LoadingMessage component
+  // LoadingMessage component
   const LoadingMessage = ({ state }) => {
     const getLoadingContent = () => {
       switch (state) {

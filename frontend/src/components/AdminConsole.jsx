@@ -70,7 +70,7 @@ const AdminSidebar = ({
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
-        {/* Header - Fixed at top */}
+        {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Admin Console</h2>
@@ -190,7 +190,7 @@ const AdminSidebar = ({
           )}
         </nav>
         
-        {/* Fixed bottom section - User info and Back to Chat */}
+        {/* Bottom section - User info and Back to Chat */}
         <div className="shrink-0">
           {/* User info */}
           <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center gap-3">

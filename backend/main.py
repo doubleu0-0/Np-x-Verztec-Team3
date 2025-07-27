@@ -1,7 +1,7 @@
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*grpcio.*", module="opentelemetry.*")
 # === FastAPI Core ===
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, Form, Body
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, Form, Body, Path as FastAPIPath, Query
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -70,6 +70,10 @@ MIMEMultipart = email.mime.multipart.MIMEMultipart
 import secrets
 import hashlib
 import base64
+
+# === Translation ====
+import argostranslate.package
+import argostranslate.translate
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = PROJECT_ROOT / "pipeline" / "data" / "raw_data"
@@ -1064,8 +1068,6 @@ def delete_file(filename: str, current_user: dict = Depends(get_current_user)):
         return JSONResponse(content={"message": f"Deleted '{filename}' successfully"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-from fastapi import Query
 
 @app.get("/logs/{log_type}")
 async def get_logs(
@@ -2568,6 +2570,9 @@ class ChatTitle(BaseModel):
     title: str
     created_at: datetime
 
+class ChatRenameRequest(BaseModel):
+    title: str
+
 class ChatLog(BaseModel):
     conversation_id: str
     content: str
@@ -2637,6 +2642,44 @@ async def get_chat_history(conversation_id: str, current_user: dict = Depends(ge
                         "created_at": row['created_at']
                     })
             return messages
+    finally:
+        conn.close()
+
+
+# === Rename chat title ===
+@app.put("/chat-history/{conversation_id}/rename")
+async def rename_chat_title(
+    conversation_id: str = FastAPIPath(...),
+    req: ChatRenameRequest = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE chatbot_logs SET title = %s WHERE user_id = %s AND conversation_id = %s",
+                (req.title, current_user["user_id"], conversation_id)
+            )
+            conn.commit()
+        return {"message": "Chat title updated"}
+    finally:
+        conn.close()
+
+# === Delete chat ===
+@app.delete("/chat-history/{conversation_id}")
+async def delete_chat(
+    conversation_id: str = FastAPIPath(...),
+    current_user: dict = Depends(get_current_user)
+):
+    conn = get_db()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM chatbot_logs WHERE user_id = %s AND conversation_id = %s",
+                (current_user["user_id"], conversation_id)
+            )
+            conn.commit()
+        return {"message": "Chat deleted"}
     finally:
         conn.close()
 
@@ -2734,3 +2777,29 @@ async def update_feedback_status(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating feedback status: {str(e)}")
+
+class TranslationRequest(BaseModel):
+    text: str
+    from_lang: str
+    to_lang: str
+
+class TranslationResponse(BaseModel):
+    translated_text: str
+    from_lang: str
+    to_lang: str
+
+@app.post("/translate", response_model=TranslationResponse)
+async def translate_text(request: TranslationRequest):
+    try:
+        translated = argostranslate.translate.translate(
+            request.text, 
+            request.from_lang, 
+            request.to_lang
+        )
+        return TranslationResponse(
+            translated_text=translated,
+            from_lang=request.from_lang,
+            to_lang=request.to_lang
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

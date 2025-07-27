@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Globe, Check, ChevronDown, Mail, AlertTriangle } from 'lucide-react';
+import { Copy, Globe, Check, ChevronDown, Mail, AlertTriangle, AlertCircle } from 'lucide-react';
 const remoteip = import.meta.env.VITE_REMOTE_IP
 
 const MessageActions = ({ content, isDarkMode }) => {
@@ -9,6 +9,10 @@ const MessageActions = ({ content, isDarkMode }) => {
   const [showTranslation, setShowTranslation] = useState(null);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [forwarding, setForwarding] = useState(false);
+  const [serverError, setServerError] = useState(false);
+
+  // Translation server
+  const SERVER_URL = `http://${remoteip}:8000`;
 
   // Check if this is an empty response that needs HR support
   const isEmptyResponse = content.includes('__EMPTY_RESPONSE_METADATA__');
@@ -21,14 +25,11 @@ const MessageActions = ({ content, isDarkMode }) => {
     { code: 'id', name: 'Indonesian', flag: '🇮🇩' },
     { code: 'ko', name: 'Korean', flag: '🇰🇷' },
     { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
-    { code: 'vi', name: 'Vietnamese', flag: '🇻🇳' },
-    { code: 'my', name: 'Myanmar', flag: '🇲🇲' },
     { code: 'es', name: 'Spanish', flag: '🇪🇸' },
     { code: 'fr', name: 'French', flag: '🇫🇷' },
     { code: 'de', name: 'German', flag: '🇩🇪' },
     { code: 'it', name: 'Italian', flag: '🇮🇹' },
-    { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
-    { code: 'ta', name: 'Tamil', flag: '🇱🇰' },
+    { code: 'hi', name: 'Hindi', flag: '🇮🇳' }
   ];
 
   const handleCopy = async () => {
@@ -39,7 +40,11 @@ const MessageActions = ({ content, isDarkMode }) => {
         .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown
         .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Remove links, keep text
         .replace(/📄.*$/s, '') // Remove citations section
+        .replace(/__CITATION_START__/g, '') // Remove citation start marker
+        .replace(/__CITATION_END__/g, '') // Remove citation end marker
+        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
         .trim();
+
       
       await navigator.clipboard.writeText(textToCopy);
       setCopied(true);
@@ -64,35 +69,57 @@ const MessageActions = ({ content, isDarkMode }) => {
 
     setTranslating(true);
     setShowLanguageDropdown(false);
+    setServerError(false);
     
     try {
-      // Clean the content for translation (remove markdown and citations)
+      // Clean the content for translation (remove markdown, citations, and citation markers)
       const cleanText = cleanContent
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .replace(/\[(.*?)\]\(.*?\)/g, '$1')
-        .replace(/📄.*$/s, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
+        .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown
+        .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Remove links, keep text
+        .replace(/📄.*$/s, '') // Remove citations section
+        .replace(/__CITATION_START__/g, '') // Remove citation start marker
+        .replace(/__CITATION_END__/g, '') // Remove citation end marker
+        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
         .trim();
 
-      // Using MyMemory API for translation
-      const response = await fetch(
-        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanText)}&langpair=en|${targetLang}`
-      );
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${SERVER_URL}/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          text: cleanText,
+          from_lang: 'en',
+          to_lang: targetLang
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+
       const data = await response.json();
       
-      if (data.responseData && data.responseData.translatedText) {
+      if (data.translated_text || data.translation) {
+        const translatedText = data.translated_text || data.translation;
         setTranslated(prev => ({
           ...prev,
-          [targetLang]: data.responseData.translatedText
+          [targetLang]: translatedText
         }));
         setShowTranslation(targetLang);
       } else {
-        throw new Error('Translation failed');
+        throw new Error('No translation returned from server');
       }
     } catch (err) {
       console.error('Translation failed:', err);
-      // Fallback message
-      const fallbackMessage = `Translation to ${languages.find(l => l.code === targetLang)?.name} temporarily unavailable. Please try again later.`;
+      setServerError(true);
+
+      const fallbackMessage = 'Translation service temporarily unavailable. Please try again later.';
+
       setTranslated(prev => ({
         ...prev,
         [targetLang]: fallbackMessage
@@ -273,6 +300,13 @@ const MessageActions = ({ content, isDarkMode }) => {
                 ? 'bg-gray-800 border-gray-600' 
                 : 'bg-white border-gray-300'
             }`}>
+              <div className={`px-3 py-2 text-xs border-b ${
+                isDarkMode 
+                  ? 'text-gray-400 border-gray-600' 
+                  : 'text-gray-500 border-gray-200'
+              }`}>
+                Select target language
+              </div>
               {languages.map((lang) => (
                 <button
                   key={lang.code}
@@ -285,7 +319,7 @@ const MessageActions = ({ content, isDarkMode }) => {
                 >
                   <span className="text-sm">{lang.flag}</span>
                   <span>{lang.name}</span>
-                  {translated[lang.code] && (
+                  {translated[lang.code] && !translated[lang.code].includes('Translation failed') && (
                     <Check className="w-3 h-3 ml-auto text-green-500" />
                   )}
                 </button>
@@ -297,14 +331,30 @@ const MessageActions = ({ content, isDarkMode }) => {
 
       {/* Translation Display */}
       {showTranslation && translated[showTranslation] && (
-        <div className={`p-3 rounded-lg border-l-4 border-blue-400 ${
-          isDarkMode ? 'bg-gray-700/50' : 'bg-blue-50'
+        <div className={`p-3 rounded-lg border-l-4 ${
+          translated[showTranslation].includes('Translation failed')
+            ? 'border-red-400'
+            : 'border-blue-400'
+        } ${
+          isDarkMode ? 'bg-gray-700/50' : 
+          translated[showTranslation].includes('Translation failed') ? 'bg-red-50' : 'bg-blue-50'
         }`}>
           <div className={`text-xs font-medium mb-1 flex items-center gap-1 ${
-            isDarkMode ? 'text-blue-300' : 'text-blue-600'
+            translated[showTranslation].includes('Translation failed')
+              ? (isDarkMode ? 'text-red-300' : 'text-red-600')
+              : (isDarkMode ? 'text-blue-300' : 'text-blue-600')
           }`}>
-            <span>{getLanguageFlag(showTranslation)}</span>
-            <span>{getLanguageName(showTranslation)} Translation:</span>
+            {translated[showTranslation].includes('Translation failed') ? (
+              <AlertCircle className="w-3 h-3" />
+            ) : (
+              <span>{getLanguageFlag(showTranslation)}</span>
+            )}
+            <span>
+              {translated[showTranslation].includes('Translation failed') 
+                ? 'Translation Error' 
+                : `${getLanguageName(showTranslation)} Translation:`
+              }
+            </span>
           </div>
           <div className={`text-sm ${
             isDarkMode ? 'text-gray-200' : 'text-gray-700'

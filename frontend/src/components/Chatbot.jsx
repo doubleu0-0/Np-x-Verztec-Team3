@@ -20,17 +20,23 @@ function Chatbot({
 }) {
   const [messages, setMessages] = useImmer([]);
   const [newMessage, setNewMessage] = useState('');
-  const [processingState, setProcessingState] = useState(null); // Replace status with processingState
+  const [processingState, setProcessingState] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [loadingLog, setLoadingLog] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false); 
+  const abortControllerRef = useRef(null); 
   const messagesEndRef = useRef(null);
 
   const isLoading = messages.length && messages[messages.length - 1].loading;
   const { speakText } = useTTS();
+  const [shouldSpeak, setShouldSpeak] = useState(false);
 
   useEffect(() => {
     if (initialMessages) {
       setMessages(initialMessages);
+      setShouldSpeak(false); // Don't speak when loading history
+      // Stop any ongoing TTS when loading chat history
+      window.speechSynthesis.cancel();
     }
   }, [initialMessages, setMessages]);
 
@@ -72,6 +78,7 @@ function Chatbot({
     setMessages(draft => {
       draft.push({ role: 'user', content: trimmedMessage });
     });
+    setShouldSpeak(false);
 
     setNewMessage('');
     setProcessingState('processing'); // Show processing animation
@@ -168,7 +175,13 @@ function Chatbot({
           assistantIndex = draft.length;
           draft.push({ role: 'assistant', content: '', loading: true });
         });
+        setShouldSpeak(false); // Don't speak until complete
 
+        setIsStreaming(true);
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
+        let hasSpoken = false;
         setProcessingState(null); // Clear processing state when streaming starts
 
         while (!done) {
@@ -180,24 +193,34 @@ function Chatbot({
             setMessages(draft => {
               if (draft[assistantIndex]) draft[assistantIndex].content += chunk;
             });
+            if (!hasSpoken && chunk.trim().length > 0) {
+              setShouldSpeak(true); // Start TTS as soon as content arrives
+              hasSpoken = true;
+            }
           }
         }
 
         setMessages(draft => {
-          if (draft[assistantIndex]) draft[assistantIndex].loading = false;
-          const finalResponse = draft[assistantIndex].content;
-          speakText(finalResponse);
+          if (draft[assistantIndex]) {
+            draft[assistantIndex].loading = false;
+          }
         });
+        setShouldSpeak(true); // Speak only after response is complete
+        setIsStreaming(false);
         return;
       }
 
     } catch (err) {
       setProcessingState(null);
-      // Could add an error state here if needed
+      setIsStreaming(false);
     }
   }
 
   async function streamAnswer(questionText, assistantIndex, originalMessage) {
+    setIsStreaming(true);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`http://${remoteip}:8000/stream`, {
@@ -212,6 +235,7 @@ function Chatbot({
           conversation_id: conversationId,
           original_message: originalMessage
         }),
+        signal: controller.signal
      });
 
       if (!res.ok) throw new Error(`Stream error: ${res.status}`);
@@ -220,6 +244,7 @@ function Chatbot({
       const decoder = new TextDecoder();
       let done = false;
 
+      let hasSpoken = false;
       while (!done) {
         const { value, done: doneReading } = await reader.read();
         done = doneReading;
@@ -229,6 +254,10 @@ function Chatbot({
             if (!draft[assistantIndex]) return;
             draft[assistantIndex].content += chunk;
           });
+          if (!hasSpoken && chunk.trim().length > 0) {
+            setShouldSpeak(true); // Start TTS as soon as content arrives
+            hasSpoken = true;
+          }
         }
       }
 
@@ -236,6 +265,7 @@ function Chatbot({
         if (!draft[assistantIndex]) return;
         draft[assistantIndex].loading = false;
       });
+      setShouldSpeak(true); // Speak only after response is complete
 
     } catch (err) {
       setMessages(draft => {
@@ -243,6 +273,8 @@ function Chatbot({
         draft[assistantIndex].loading = false;
         draft[assistantIndex].content = "Error streaming response.";
       });
+    } finally {
+      setIsStreaming(false); 
     }
   }
 
@@ -279,6 +311,7 @@ function Chatbot({
             messages={messages} 
             isLoading={isLoading} 
             processingState={processingState}
+            shouldSpeak={shouldSpeak}
           />
         )}
         <div ref={messagesEndRef} />
@@ -289,6 +322,38 @@ function Chatbot({
         isLoading={isLoading || processingState !== null}
         setNewMessage={setNewMessage}
         submitNewMessage={submitNewMessage}
+        isStreaming={isStreaming}                 
+        onStop={async () => {
+          if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+          }
+          // Log the partial response to backend
+          // Find the last user message and last assistant message
+          const lastUserMsg = messages.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+          const lastAssistantMsgIdx = messages.map((m, i) => m.role === 'assistant' ? i : -1).filter(i => i !== -1).slice(-1)[0];
+          const lastAssistantMsg = lastAssistantMsgIdx !== undefined && lastAssistantMsgIdx !== -1 ? messages[lastAssistantMsgIdx].content : '';
+          // Only log if there is a partial response
+          if (lastUserMsg && lastAssistantMsg) {
+            try {
+              const token = localStorage.getItem('token');
+              await fetch(`http://${remoteip}:8000/log_conversation/`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  query: lastUserMsg,
+                  response: lastAssistantMsg,
+                  conversation_id: conversationId
+                })
+              });
+            } catch (err) {
+              // Optionally show error to user
+            }
+          }
+        }}
+        isDarkMode={isDarkMode}
       />
     </div>
   );

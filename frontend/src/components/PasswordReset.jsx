@@ -1,4 +1,3 @@
-// Create: frontend/src/components/PasswordReset.jsx
 import { useState, useEffect } from 'react';
 import Toast from './Toast';
 const remoteip = import.meta.env.VITE_REMOTE_IP

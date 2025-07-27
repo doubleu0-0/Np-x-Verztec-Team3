@@ -41,7 +41,7 @@ function SignIn({ onLogin }) {
       // Store token (localStorage for now)
       localStorage.setItem('token', token);
 
-      // Optional: Fetch profile info
+      // Fetch profile info
       const profileRes = await fetch(`http://${remoteip}:8000/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -154,12 +154,12 @@ function SignIn({ onLogin }) {
           </p>
         </div>
 
-        {/* Enhanced Forgot Password Modal */}
+        {/* Forgot Password Modal */}
         {showForgotPassword && (
           <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8 w-[90%] max-w-md mx-4 transform transition-all duration-300 scale-100">
               
-              {/* Top Graphic - Signpost Illustration */}
+              {/* Signpost Illustration */}
               <div className="flex justify-center mb-6">
                 <div className="w-20 h-20 bg-yellow-50 dark:bg-yellow-900/20 rounded-full flex items-center justify-center">
                   <svg
