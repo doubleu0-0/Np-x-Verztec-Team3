@@ -94,6 +94,7 @@ Get-Command python
 ```
 
 ### 6. Start the Entire Stack
+- Create start-all.ps1 in the root directory using start-all.ps1.example
 - Open a new Powershell terminal and run the following command (Outside venv) (Only localhost)
 ```powershell
 .\start-all.ps1
@@ -101,6 +102,7 @@ Get-Command python
 
 OR
 
+- Create start-all-everywhere.ps1 in the root directory using start-all-everywhere.ps1.example
 - Open a new Powershell terminal and run the following command (Outside venv) (Usable from everywhere)
 ```powershell
 .\start-all-everywhere.ps1
