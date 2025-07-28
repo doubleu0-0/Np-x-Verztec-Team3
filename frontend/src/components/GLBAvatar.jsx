@@ -10,17 +10,46 @@ function AvatarModel({ selectedAvatar }) {
   const gltf = useGLTF(`/human_avatar/${selectedAvatar}.glb`)
   const mixerRef = useRef()
   const talkingMeshes = useRef([])
-  const { isSpeaking, visemeData } = useTTS()
-
-  // Load idle FBX animation
+  const idleActionRef = useRef()
+  const thinkingActionRef = useRef()
+  const { isSpeaking, visemeData, isProcessing } = useTTS()
+  
+  // Load both idle and thinking FBX animations
   useEffect(() => {
     const loader = new FBXLoader()
+    
+    // Load idle animation
     loader.load('/human_avatar/idle.fbx', (fbx) => {
       const mixer = new THREE.AnimationMixer(gltf.scene)
-      mixer.clipAction(fbx.animations[0]).play()
+      const idleAction = mixer.clipAction(fbx.animations[0])
+      idleAction.play()
+      idleActionRef.current = idleAction
       mixerRef.current = mixer
     })
+    
+    // Load thinking animation
+    loader.load('/human_avatar/thinking.fbx', (fbx) => {
+      if (mixerRef.current) {
+        const thinkingAction = mixerRef.current.clipAction(fbx.animations[0])
+        thinkingActionRef.current = thinkingAction
+      }
+    })
   }, [gltf.scene])
+
+  // Switch animations based on processing state
+  useEffect(() => {
+    if (!idleActionRef.current || !thinkingActionRef.current) return
+    
+    if (isProcessing) {
+      // Fade to thinking animation
+      idleActionRef.current.fadeOut(0.5)
+      thinkingActionRef.current.reset().fadeIn(0.5).play()
+    } else {
+      // Fade back to idle animation
+      thinkingActionRef.current.fadeOut(0.5)
+      idleActionRef.current.reset().fadeIn(0.5).play()
+    }
+  }, [isProcessing])
 
   // Collect meshes with morph targets for lip sync
   useEffect(() => {
