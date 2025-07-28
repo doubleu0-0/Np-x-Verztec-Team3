@@ -1,0 +1,32 @@
+# Ignore installed dependencies (we install fresh in Docker)
+node_modules
+
+# Build output (in case you use `npm run build`)
+dist
+
+# Test folders (optional)
+test
+
+# System + editor files
+.DS_Store
+Thumbs.db
+
+# Git files
+.git
+.gitignore
+
+# Environment variables
+.env
+.env.*  # ignore .env.local, .env.production, etc.
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Vite & cache
+.vite
+.cache
+
+# OS-specific
+*.swp
