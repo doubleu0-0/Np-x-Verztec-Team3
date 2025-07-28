@@ -14,6 +14,7 @@ export const TTSProvider = ({ children, selectedAvatar }) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [visemeData, setVisemeData] = useState({
     mouthOpen: 0,
     mouthWide: 0,
@@ -164,7 +165,9 @@ export const TTSProvider = ({ children, selectedAvatar }) => {
       speakText,
       isMuted,
       setIsMuted,
-      toggleMute // 
+      toggleMute,
+      isProcessing,
+      setIsProcessing
     }}>
       {children}
     </TTSContext.Provider>
