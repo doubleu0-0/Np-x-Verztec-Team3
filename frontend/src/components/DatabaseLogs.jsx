@@ -33,6 +33,64 @@ const DATE_COLUMNS = [
 ];
 const remoteip = import.meta.env.VITE_REMOTE_IP
 
+// Add this function before your component
+const processLogsWithSharedTitles = (logs) => {
+  console.log('Processing logs:', logs); // Add this
+  
+  if (!logs.rows || logs.rows.length === 0) return logs;
+  
+  // Group rows by conversation_id and find titles
+  const conversationTitles = {};
+  
+  // First pass: collect all existing titles for each conversation_id
+  logs.rows.forEach(row => {
+    const conversationId = row.conversation_id;
+    const title = row.title;
+    
+    console.log(`Row - conversation_id: ${conversationId}, title: "${title}"`); // Add this
+    
+    if (conversationId) {
+      if (!conversationTitles[conversationId]) {
+        conversationTitles[conversationId] = null;
+      }
+      
+      // Use the first non-empty title found for this conversation
+      if (title && title.trim() && !conversationTitles[conversationId]) {
+        conversationTitles[conversationId] = title;
+      }
+    }
+  });
+  
+  console.log('Found conversation titles:', conversationTitles); // Add this
+  
+  // Second pass: assign default titles for conversations without titles
+  Object.keys(conversationTitles).forEach(conversationId => {
+    if (!conversationTitles[conversationId]) {
+      conversationTitles[conversationId] = `Conversation ${conversationId}`;
+    }
+  });
+  
+  console.log('Final conversation titles:', conversationTitles); // Add this
+  
+  // Third pass: update all rows with the shared title
+  const updatedRows = logs.rows.map(row => {
+    if (row.conversation_id && conversationTitles[row.conversation_id]) {
+      return {
+        ...row,
+        title: conversationTitles[row.conversation_id]
+      };
+    }
+    return row;
+  });
+  
+  console.log('Updated rows sample:', updatedRows.slice(0, 3)); // Add this
+  
+  return {
+    ...logs,
+    rows: updatedRows
+  };
+};
+
 export default function DatabaseLogs({ isDarkMode, activeLogTab }) {
   const [logs, setLogs] = useState({ columns: [], rows: [] });
   const [loading, setLoading] = useState(false);
@@ -72,9 +130,14 @@ export default function DatabaseLogs({ isDarkMode, activeLogTab }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
+        let data = await res.json();
 
-        // Filter out primary ID columns
+        // Process chatbot_logs to ensure shared titles
+        if (tab === 'chatbot_logs') {
+          data = processLogsWithSharedTitles(data);
+        }
+
+        // Filter out primary 
         let filteredColumns = data.columns.filter(col =>
           !col.toLowerCase().includes('_id') ||
           col.toLowerCase().includes('user_id') ||
@@ -108,12 +171,84 @@ export default function DatabaseLogs({ isDarkMode, activeLogTab }) {
   };
 
   useEffect(() => {
-    if (activeLogTab) fetchLogs(activeLogTab);
-    setSearchTerm("");
-    setSelectedColumns({});
-    setCurrentPage(1);
-    setSortConfig({ key: null, direction: "asc" });
-    // eslint-disable-next-line
+    const fetchData = async () => {
+      if (!activeLogTab) return;
+      setLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`http://${remoteip}:8000/logs/${activeLogTab}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
+          throw new Error("Failed to fetch logs");
+        }
+        
+        let data = await response.json();
+        console.log('Raw data from API:', data);
+        console.log('Data columns:', data.columns);
+        console.log('Data rows length:', data.rows ? data.rows.length : 'No rows property');
+        console.log('First few rows:', data.rows ? data.rows.slice(0, 3) : 'No rows');
+        
+        // Process chatbot_logs to ensure shared titles
+        if (activeLogTab === 'chatbot_logs') {
+          console.log('Processing chatbot logs...');
+          data = processLogsWithSharedTitles(data);
+          console.log('After processing:', data);
+        }
+        
+        // Filter out primary ID columns and conversation_id for chatbot_logs
+        let filteredColumns = data.columns.filter(col => {
+          // Hide all _id columns except specific ones we want to keep
+          if (col.toLowerCase().includes('_id') && 
+              !col.toLowerCase().includes('user_id') && 
+              !col.toLowerCase().includes('file_id')) {
+            return false;
+          }
+          // Hide conversation_id for chatbot_logs since we have the title
+          if (activeLogTab === 'chatbot_logs' && col === 'conversation_id') {
+            return false;
+          }
+          return true;
+        });
+        
+        console.log('Filtered columns:', filteredColumns);
+
+        // Hide file_id only for file_update_logs
+        if (activeLogTab === "file_update_logs") {
+          filteredColumns = filteredColumns.filter(col => col !== "file_id");
+        }
+
+        // Filter rows to only include non-ID columns
+        const filteredRows = data.rows.map(row => {
+          const filteredRow = {};
+          filteredColumns.forEach(col => {
+            filteredRow[col] = row[col];
+          });
+          return filteredRow;
+        });
+
+        console.log('Filtered rows length:', filteredRows.length);
+        console.log('Final logs state to set:', { columns: filteredColumns, rows: filteredRows });
+
+        setLogs({ columns: filteredColumns, rows: filteredRows });
+        
+        // Initialize selectedColumns as empty object instead of setting all to true
+        setSelectedColumns({});
+      } catch (error) {
+        console.error("Error fetching logs:", error);
+        setLogs({ columns: [], rows: [] });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [activeLogTab]);
 
   // Filtering and searching
@@ -128,12 +263,22 @@ export default function DatabaseLogs({ isDarkMode, activeLogTab }) {
       );
     })
     .filter((row) => {
-      // Column filters
+      // Column filters - Fixed logic
       return Object.entries(selectedColumns).every(([col, value]) => {
-        if (!value) return true;
+        // If value is true/false (boolean), skip filtering for this column
+        if (typeof value === 'boolean') return true;
+        // If value is empty string, skip filtering
+        if (!value || value === '') return true;
+        // Otherwise, filter by exact match
         return String(row[col] ?? "") === value;
       });
     });
+
+  console.log('Logs state:', logs);
+  console.log('Search term:', searchTerm);
+  console.log('Selected columns for filtering:', selectedColumns);
+  console.log('Filtered rows length:', filteredRows.length);
+  console.log('Sample filtered rows:', filteredRows.slice(0, 3));
 
   // Sorting
   const sortedRows = [...filteredRows].sort((a, b) => {

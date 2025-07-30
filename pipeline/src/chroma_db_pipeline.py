@@ -57,7 +57,12 @@ print(f"Project root: {PROJECT_ROOT}")
 RAW_DATA = PROJECT_ROOT / 'data' / 'raw_data'
 LOG_FILE = PROJECT_ROOT / 'data' / 'Logs' / 'processed_files.json'
 PERSIST_DIR = PROJECT_ROOT / 'data' / 'ChromaDB'
-
+SPECIAL_TITLE_MAPPINGS = {
+    "2_QUALITY MANUAL-revised Jan 2016-rev NOV 2016-020924.txt": "Main ISO file document"
+    # Add more mappings here as needed:
+    # "another_file.pdf": "Enhanced title for search",
+    # "procedure_doc.docx": "Standard operating procedure manual",
+}
 # This one is for embeding USER query
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2") # MUST BE SAME AS THE ONE USED FOR INDEXING
 # Load model locally
@@ -583,11 +588,15 @@ def split_into_documents(text, chunk_size=1000, chunk_overlap=200, title="Untitl
     chunks = splitter.split_text(text)
     print(f"Total chunks: {len(chunks)}\n", flush=True)
 
+    display_title = SPECIAL_TITLE_MAPPINGS.get(title, title)
+    if display_title != title:
+        print(f"[TITLE MAPPING] {title} -> {display_title}", flush=True)
+
     documents = []
     for i, chunk in enumerate(chunks):
         metadata = {
             "chunk": i,
-            "title": title,
+            "title": display_title,
             "source": source,
         }
         for dept in ALL_DEPARTMENTS:
@@ -678,6 +687,7 @@ def extract_text_from_file(file_path):
         return  # Skip JSON files, as they are used for metadata and not for text extraction
     else:
         raise ValueError(f"Unsupported file type: {file_extension}")
+
 
 def run_pipeline(raw_folder):
     new_files = []

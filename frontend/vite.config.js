@@ -8,7 +8,7 @@ export default defineConfig({
     port: 3000,         // Set preferred port
     strictPort: true,    // Do not fallback to random port
     hmr: {
-      host: '192.168.96.1',
+      host: '192.168.84.94',
     }
   },
   preview: {

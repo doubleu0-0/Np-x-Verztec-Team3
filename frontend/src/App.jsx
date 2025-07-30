@@ -56,7 +56,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
   const handleRenameChat = async (conversationId, newTitle) => {
     const token = localStorage.getItem('token');
     try {
-      await fetch(`http://localhost:8000/chat-history/${conversationId}/rename`, {
+      await fetch(`http://${remoteip}:8000/chat-history/${conversationId}/rename`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +73,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
   const handleDeleteChat = async (conversationId) => {
     const token = localStorage.getItem('token');
     try {
-      await fetch(`http://localhost:8000/chat-history/${conversationId}`, {
+      await fetch(`http://${remoteip}:8000/chat-history/${conversationId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

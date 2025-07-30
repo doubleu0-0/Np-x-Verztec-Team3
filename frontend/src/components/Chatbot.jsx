@@ -271,7 +271,6 @@ function Chatbot({
       setMessages(draft => {
         if (!draft[assistantIndex]) return;
         draft[assistantIndex].loading = false;
-        draft[assistantIndex].content = "Error streaming response.";
       });
     } finally {
       setIsStreaming(false); 

@@ -109,7 +109,7 @@ redis_client = redis.Redis(host=LOCAL_IP, port=6380, db=0, decode_responses=True
 
 # Set up Ollama and HuggingFace embedding
 Settings.embed_model = HuggingFaceEmbedding(model_name="intfloat/e5-large-v2")
-remote_base_url = f"http://{REMOTE_IP}:11434"
+remote_base_url = f"http://{LOCAL_IP}:11434"
 
 # Instantiate the Ollama LLM
 llm = Ollama(model="llama3.2:latest", request_timeout=120.0, temperature=0, context_window=4096, base_url=remote_base_url)
@@ -186,23 +186,24 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
 # Prompt template
 prompt_template = """
-You are Verztec's AI HR assistant.
+You are Verztec's AI Corporate assistant.
 
-Your task is to extract all meaningful HR-related questions or concerns from the user's message.
+Your task is to extract all meaningful Corporate-related questions or concerns from the user's message.
 
 For each item:
 - Assign a concise label (e.g., "Leave entitlement", "Workplace harassment")
 - Rewrite the question or concern in a short, clear form — **do not add explanations, notes, or assumptions**
-- Only include relevant HR-related content, not exhaustive-(e.g., leave, claims, WFH, policies, pantry, etiquette, misconduct, benefits, office or organisation-related matters)
+- Only include relevant Corporate-related content, not exhaustive-(e.g., leave, claims, WFH, policies, pantry, etiquette, misconduct, benefits, office, ISO and QMS files or organisation-related matters)
+- If the user asked about ISO files, change "ISO" to "ISO/QMS files" to include both ISO and QMS files.
 - Always rewrite from the user's point of view using "I" instead of "you" unless specified
-- Ignore all non-HR and off-topic content
+- Ignore all non-Corporate and off-topic content
 
 ⚠️ Your response must strictly follow this format:
 1. **[Label]**: [Simplified question or concern]
 
 ❌ Do NOT include commentary, explanations, extra notes, or anything outside the format above.
 
-If no HR-related questions or concerns are found, respond exactly: No HR-related questions or concerns detected.
+If no Corporate-related questions or concerns are found, respond exactly: No Corporate-related questions or concerns detected.
 
 Below is the raw user message, between <user></user> tags. Only process what's inside:
 
@@ -318,7 +319,8 @@ async def process_message(
     if not questions:
         print("[INFO] No HR-related questions found. Generating fallback...")
         fallback_prompt = f"""You are Verztec's AI HR assistant. The user did not ask any HR-related questions or concerns.
-        If the message isn't about HR (like leave, claims, benefits, or work policies), reply in a super casual, friendly manner. 
+        If the message isn't about corporate things (ISO/QMS files and company standars)
+        or HR (like leave, claims, benefits, or work policies), reply in a super casual, friendly manner. 
         No formal greetings, no sign-offs, no long explanations. Just a short, warm, human reply.
         If the user says something sweet or emotional (like "thank you" or "you're the best"), feel free to respond in kind—e.g., "Aww, thanks!", "You're awesome!", or use emojis.
         If you're not sure what they meant, gently ask if they have any HR-related questions, but keep it light and informal.
@@ -497,6 +499,7 @@ async def stream_answer(
     You are able to provide information about HR policies, leave, benefits, claims, WFH, or company policies.
     Answer all questions in a friendly and human-like manner. If you are not confident about the answer,
     you should tell the user that you are not sure and suggest they contact HR directly.
+    You should reply in the same language as the user's prompt.
     """
     
     print(f"[STREAM] Querying with: {data.message}")
@@ -513,7 +516,6 @@ async def stream_answer(
 
     # Helper to check for boilerplate/empty responses
     def is_response_empty(resp):
-        print("[DEBUG] is_response_empty() called")
         BOILERPLATE = [
             "no response",
             "no relevant information found", 
@@ -673,20 +675,22 @@ async def stream_answer(
             snippet = node.text[:500]  # Shorter snippet
             docs_summary.append(f"{i+1}. {doc_name}: {snippet}")
         
-        prompt = f"""
-            Given this user query and AI response, which documents are most relevant?
+            prompt = f"""
+                Given the user query and AI response, select the most relevant document based on content and authority.
 
-            Query: {query}
-            Response: {response_text[:1000]}...
+                Query: {query}
+                Response: {response_text[:1000]}...
 
-            Available documents:
-            {chr(10).join(docs_summary)}
+                Available documents:
+                {chr(10).join(docs_summary)}
 
-            Select the most relevant document numbers (e.g., "1,3,5"). 
-            If you think none are relevant, respond with "none".
-            Best number is 1 citation only.
-            Only respond with the numbers, comma-separated.
-            """
+                Instructions:
+                - If the user query **does not** mention the term "ISO", you may assume documents with "ISO" in the title are relevant.
+                - However, **if the user query includes the term "ISO"**, do **not** automatically assume a document is relevant just because its title includes "ISO". Instead, evaluate the actual content and choose the most authoritative or governing document (e.g., quality manuals, standards, or policies).
+                - Prefer foundational or policy-setting documents over audits, logs, or records of implementation.
+                - Select only the single best document number. If none are relevant, respond with "none".
+                - Only respond with the number(s), comma-separated. No explanation needed.
+                            """
 
         try:
             llm_response = llm_model.complete(prompt)
@@ -706,6 +710,16 @@ async def stream_answer(
     def stream_generator():
         buffer = io.StringIO()
         response_text = ""
+
+        # Debug: Print only document titles used
+        print(f"[DEBUG] Total source nodes retrieved: {len(response.source_nodes) if hasattr(response, 'source_nodes') and response.source_nodes else 0}")
+        if hasattr(response, 'source_nodes') and response.source_nodes:
+            print("[DEBUG] Documents used for response generation:")
+            for i, node_with_score in enumerate(response.source_nodes):
+                node = node_with_score.node
+                doc_name = node.metadata.get("source") or node.metadata.get("title", "Unknown")
+                print(f"  {i+1}. {doc_name}")
+            print()
         
         # Check if we have peeked tokens stored
         if hasattr(response, '_peeked_tokens') and hasattr(response, '_original_gen'):
@@ -1082,9 +1096,9 @@ async def get_logs(
     LOG_TABLES = {
         "chatbot_logs": {
             "table": "chatbot_logs",
-            "columns": ["log_id", "user", "conversation_id", "query", "response", "created_at"],
+            "columns": ["log_id", "user", "title", "query", "response", "created_at", "conversation_id"],
             "sql": """
-                SELECT log_id, username AS user, conversation_id, query, response, created_at
+                SELECT log_id, username AS user, title, query, response, created_at, conversation_id
                 FROM chatbot_logs
                 ORDER BY log_id DESC
             """
@@ -2231,8 +2245,7 @@ async def update_file_metadata(
     update_docs_with_metadata(filename, meta)
 
     return {"message": "File metadata updated"}
-
-
+    
 def update_docs_with_metadata(filename, file_metadata):
     """
     Updates all Chroma documents whose 'title' in metadata matches the given filename (tries all common extensions).

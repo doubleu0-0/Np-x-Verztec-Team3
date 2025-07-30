@@ -195,7 +195,7 @@ export default function UploadXlsxButton() {
               Use this Excel form to upload users in bulk.
             </div>
             <a
-              href={`http://${remoteip}:8000/static/Adding%20Users.xlsx`}
+              href={`http://${remoteip}:8000/static/Adding_Users.xlsx`}
               download
               className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition-colors"
             >
