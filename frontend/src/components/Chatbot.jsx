@@ -279,15 +279,6 @@ function Chatbot({
 
   return (
     <div className="relative flex flex-col h-full min-h-0">
-      {userProfile && (
-        <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2 mb-4 flex flex-wrap gap-4 text-sm text-gray-700 dark:text-gray-200">
-          <div><b>User:</b> {userProfile.username}</div>
-          <div><b>Role:</b> {userProfile.role}</div>
-          <div><b>Country:</b> {userProfile.country}</div>
-          <div><b>Department:</b> {userProfile.department}</div>
-        </div>
-      )}
-
       <div className='flex-1 overflow-y-auto min-h-0 space-y-4 p-4'>
         {messages.length === 0 && !processingState ? (
           <>
