@@ -6,7 +6,10 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',   // Accept connections from any IP (LAN)
     port: 3000,         // Set preferred port
-    strictPort: true    // Do not fallback to random port
+    strictPort: true,    // Do not fallback to random port
+    hmr: {
+      host: '192.168.84.94',
+    }
   },
   preview: {
     port: 3000,

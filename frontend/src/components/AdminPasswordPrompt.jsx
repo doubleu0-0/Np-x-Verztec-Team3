@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Lock } from 'lucide-react';
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
 export default function AdminPasswordPrompt({ onPasswordVerified, onCancel, isDarkMode }) {
   const [password, setPassword] = useState('');
@@ -13,7 +14,7 @@ export default function AdminPasswordPrompt({ onPasswordVerified, onCancel, isDa
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/verify-admin-password', {
+      const response = await fetch(`http://${remoteip}:8000/verify-admin-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

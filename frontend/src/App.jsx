@@ -8,6 +8,7 @@ import ProfileDropdown from '@/components/ProfileDropdown';
 import ModelSelector from '@/components/ModelSelector';
 import UploadXlsxButton from '@/components/UploadXlsxButton';
 import UploadFile from '@/components/UploadFile';
+import Feedback from '@/components/Feedback';
 import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
 import ReactMarkdown from 'react-markdown';
@@ -16,6 +17,8 @@ import GLBAvatar from '@/components/GLBAvatar';
 import { TTSProvider } from '@/contexts/TTSContext';
 import AdminConsole from '@/components/AdminConsole';
 import AdminPasswordPrompt from '@/components/AdminPasswordPrompt';
+import PasswordReset from './components/PasswordReset';
+import MuteButton from '@/components/MuteButton';
 
 const models = [
   {
@@ -47,7 +50,39 @@ const avatarNames = {
   avatar6: "Her"
 };
 
-function AppContent() {
+const remoteip = import.meta.env.VITE_REMOTE_IP
+function AppContent({ selectedAvatar, setSelectedAvatar }) {
+    // Handler for renaming a chat
+  const handleRenameChat = async (conversationId, newTitle) => {
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`http://${remoteip}:8000/chat-history/${conversationId}/rename`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ title: newTitle })
+      });
+      await loadChats();
+    } catch (e) {
+    }
+  };
+
+  // Handler for deleting a chat
+  const handleDeleteChat = async (conversationId) => {
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`http://${remoteip}:8000/chat-history/${conversationId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await loadChats();
+      if (selectedLogId === conversationId) setSelectedLogId(null);
+    } catch (e) {
+    }
+  };
+
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -58,7 +93,6 @@ function AppContent() {
   const [view, setView] = useState('chat');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
-  const [selectedAvatar, setSelectedAvatar] = useState('avatar6');
   const [selectedLogId, setSelectedLogId] = useState(null);
   const [adminPasswordVerified, setAdminPasswordVerified] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -66,6 +100,9 @@ function AppContent() {
   const [chats, setChats] = useState([]);
   const [filteredChats, setFilteredChats] = useState([]);
   const [markdownContent, setMarkdownContent] = useState('');
+  const [isPasswordReset, setIsPasswordReset] = useState(false);
+  const [selectedChatMessages, setSelectedChatMessages] = useState([]);
+  const [conversationId, setConversationId] = useState(() => uuidv4());
   
   const modelDropdownRef = useRef(null);
 
@@ -80,15 +117,16 @@ function AppContent() {
   const loadChats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/search?q=', {
+      const response = await fetch(`http://${remoteip}:8000/chat-history/titles`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       
       if (response.ok) {
-        const chatData = await response.json();
-        setChats(chatData);
+        const chatTitles = await response.json();
+        setChats(chatTitles);
+        setFilteredChats(chatTitles);
       }
     } catch (error) {
       console.error('Failed to load chats:', error);
@@ -143,10 +181,32 @@ function AppContent() {
     setIsDarkMode(prev => !prev);
   };
 
-  const handleNewChat = () => {
-    setView('chat');
-    setSelectedLogId(null);
+  const handleNewChat = async () => {
+    const newId = uuidv4();
+    setConversationId(newId);
+    setSelectedLogId(newId);
+    setSelectedChatMessages([]);
     setIsSidebarOpen(false);
+    setView('chat');
+    await loadChats();
+  };
+
+  const loadChatMessages = async (conversation_id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://${remoteip}:8000/chat-history/${conversation_id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const chatMessages = await response.json();
+        setSelectedChatMessages(chatMessages);
+      }
+    } catch (error) {
+      console.error('Failed to load chat messages:', error);
+    }
   };
 
   const handleSearch = () => {
@@ -155,7 +215,7 @@ function AppContent() {
 
   const handleLogin = async (email) => {
     const token = localStorage.getItem('token');
-    const profileRes = await fetch('http://localhost:8000/profile', {
+    const profileRes = await fetch(`http://${remoteip}:8000/profile`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const profileData = await profileRes.json();
@@ -167,7 +227,7 @@ function AppContent() {
     const token = localStorage.getItem('token');
     if (token) {
       try {
-        await fetch('http://localhost:8000/logout', {
+        await fetch(`http://${remoteip}:8000/logout`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -180,6 +240,11 @@ function AppContent() {
     localStorage.removeItem('token');
     setIsLoggedIn(false);
     setSelectedProfile(null);
+    setChats([]);
+    setFilteredChats([]);
+    setSelectedChatMessages([]);
+    setSelectedLogId(null);
+    setView('chat'); 
   };
 
   const handleAvatarChange = (avatarName) => {
@@ -192,30 +257,79 @@ function AppContent() {
     setIsSidebarOpen(false);
   };
 
-  const handleChatSelect = (logId) => {
-    setSelectedLogId(logId);
+  const handleChatSelect = async(conversation_id) => {
+    setSelectedLogId(conversation_id);
+    setConversationId(conversation_id);
     setView('chat');
     setIsSidebarOpen(false);
     setIsSearchOpen(false);
-  };
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://${remoteip}:8000/chat-history/${conversation_id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    if (response.ok) {
+      const fullChat = await response.json();
+      console.log("Fetched messages for conversation", conversation_id, fullChat);
+      setSelectedChatMessages(fullChat);
+    } else {
+      console.warn("Chat history not found or failed for", conversation_id);
+      setSelectedChatMessages([]);
+    }
+  } catch (error) {
+    console.error('Failed to load chat messages:', error);
+    setSelectedChatMessages([]);
+  }
+};
 
   const handleCloseSidebar = () => {
     setIsSidebarOpen(false);
   };
 
   // Add function to refresh chats when a new chat is created
-  const handleNewChatCreated = () => {
-    loadChats();
+  const handleNewChatCreated = async (newConversationId) => {
+    await loadChats(); // Wait for chats to load
+    setSelectedLogId(newConversationId); // Select the new chat
+    setConversationId(newConversationId); // Set conversationId for new chat
+    setView('chat'); // Ensure chat view is active
+    // Optionally, load messages for the new chat if available
+    await loadChatMessages(newConversationId);
   };
 
   const currentModel = models.find(m => m.name === selectedModel);
 
+  // Add useEffect to check URL parameters for password reset
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const userId = urlParams.get('user_id');
+    
+    if (token && userId) {
+      setIsPasswordReset(true);
+    }
+  }, []);
+
+  // If it's a password reset, show the password reset component BEFORE the login check
+  if (isPasswordReset) {
+    return (
+      <div className={isDarkMode ? 'dark' : ''}>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+          <PasswordReset 
+            onComplete={() => {
+              setIsPasswordReset(false);
+              // Clear URL parameters
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (!isLoggedIn) {
     return (
-      <div
-        className="min-h-screen bg-cover bg-center flex items-center justify-center"
-        style={{ backgroundImage: "url('/src/assets/images/background.png')" }}
-      >
+      <div className={isDarkMode ? 'dark' : ''}>
         <SignIn onLogin={handleLogin} />
       </div>
     );
@@ -237,7 +351,7 @@ function AppContent() {
           fixed lg:relative inset-y-0 left-0 z-50 w-80 lg:w-64 xl:w-72 2xl:w-80
           transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           transition-transform duration-300 ease-in-out
-          ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}
+          ${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
           border-r flex flex-col
         `}>
           {/* Sidebar Header */}
@@ -255,7 +369,6 @@ function AppContent() {
                 </svg>
               </button>
             </div>
-            
             {/* New Chat Button */}
             <button
               onClick={handleNewChat}
@@ -263,7 +376,6 @@ function AppContent() {
             >
               + New Chat
             </button>
-
             {/* Chat Search Button */}
             <div className="relative">
               <button
@@ -341,43 +453,21 @@ function AppContent() {
             </div>
           </div>
 
-          {/* Chat List */}
-          <div className="flex-1 overflow-y-auto p-2">
-            {filteredChats.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                {chatSearchQuery ? 'No chats found' : 'No chats yet'}
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {filteredChats.map((chat) => (
-                  <button
-                    key={chat.log_id}
-                    onClick={() => handleChatSelect(chat.log_id)}
-                    className={`
-                      w-full text-left p-3 rounded-md transition-colors
-                      ${selectedLogId === chat.log_id 
-                        ? 'bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-yellow-500' 
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }
-                    `}
-                  >
-                    <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
-                      {chat.query || 'Untitled Chat'}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
-                      {chat.response?.substring(0, 100) || 'No preview available'}
-                    </div>
-                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      {new Date(chat.created_at).toLocaleDateString()}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Chat List with 3-dots menu */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <Sidebar
+              chats={filteredChats}
+              selectedChatId={selectedLogId}
+              onSelectChat={handleChatSelect}
+              onRenameChat={handleRenameChat}
+              onDeleteChat={handleDeleteChat}
+              onNewChat={handleNewChat}
+              onSearch={() => setIsSearchOpen(true)}
+            />
           </div>
 
           {/* User Role Panel */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-inherit">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -398,7 +488,6 @@ function AppContent() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                
                 {/* Profile Dropdown */}
                 <div className="relative">
                   <ProfileDropdown
@@ -420,18 +509,20 @@ function AppContent() {
       {/* Main Content */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Mobile Header */}
-        <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <img src={isDarkMode ? white_logo : logo} className="w-24" alt="logo" />
-          <div className="w-10"></div>
-        </div>
+        {!(view === "adminConsole" && adminPasswordVerified) && (
+          <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <img src={isDarkMode ? white_logo : logo} className="w-24" alt="logo" />
+            <div className="w-10"></div>
+          </div>
+        )}
 
         {/* Desktop Header - Hide in verified admin console */}
         {!(view === "adminConsole" && adminPasswordVerified) && (
@@ -482,6 +573,7 @@ function AppContent() {
                       </div>
                     )}
                   </div>
+                  <MuteButton />
                 </div>
                 
                 <div className="flex items-center gap-2 order-1 sm:order-2">
@@ -492,6 +584,18 @@ function AppContent() {
                     }`}
                   >
                     Chat
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setView('feedback');
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`px-4 py-2 text-sm rounded font-medium transition-colors ${
+                      view === 'feedback' ? 'bg-yellow-500 text-black' : 'bg-yellow-300 hover:bg-yellow-400 text-black'
+                    }`}
+                  >
+                    Feedback
                   </button>
 
                   {(userProfile?.role === 'ADMIN' || userProfile?.role === 'MANAGER') && (
@@ -512,7 +616,7 @@ function AppContent() {
 
         {/* Main Content Area */}
         {view === "adminConsole" && adminPasswordVerified ? (
-          // Full screen AdminConsole - no scrolling, no constraints
+          // Full screen AdminConsole
           <div className="flex-1 h-full">
             <AdminConsole
               userProfile={userProfile}
@@ -532,6 +636,15 @@ function AppContent() {
                     setSelectedModel={setSelectedModel}
                     selectedLogId={selectedLogId}
                     onNewChatCreated={handleNewChatCreated}
+                    messages={selectedChatMessages}
+                    conversationId={conversationId}
+                    setConversationId={setConversationId} 
+                  />
+                )}
+                {view === 'feedback' && (
+                  <Feedback 
+                    userProfile={userProfile}
+                    isDarkMode={isDarkMode}
                   />
                 )}
                 {view === 'uploadXlsx' && <UploadXlsxButton />}
@@ -576,11 +689,23 @@ function AppContent() {
 
 // Main App component wrapped with TTSProvider
 function App() {
+  const [selectedAvatar, setSelectedAvatar] = useState('avatar6');
   return (
-    <TTSProvider>
-      <AppContent />
+    <TTSProvider selectedAvatar={selectedAvatar}>
+      <AppContent 
+        selectedAvatar={selectedAvatar}
+        setSelectedAvatar={setSelectedAvatar}
+      />
     </TTSProvider>
   );
 }
 
 export default App;
+
+function uuidv4() {
+  // RFC4122 version 4 compliant UUID generator
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}

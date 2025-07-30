@@ -10,9 +10,12 @@ openpyxl
 llama_index
 llama_index.llms.ollama
 llama_index.embeddings.huggingface
-llama-index-vector-stores-faiss
 faiss-cpu
 pydantic[email]
 python-multipart
 cryptography
 redis
+git+https://github.com/openai/whisper.git
+chromadb
+llama-index-vector-stores-chroma
+argostranslate

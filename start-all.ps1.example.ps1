@@ -1,0 +1,42 @@
+# Create Virtual Environment Manually First
+
+# Getting the root directory
+$ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
+
+# Defining subpaths
+$BackendPath = Join-Path $ProjectRoot "backend"
+$FrontendPath = Join-Path $ProjectRoot "frontend"
+$RedisPath = "C:\Program Files\Redis"
+
+# Activating Python venv
+Write-Host "Activating Python virtual environment..."
+Set-Location $BackendPath
+& "$BackendPath\venv\Scripts\Activate.ps1"
+
+# Installing Python dependencies
+Write-Host "Installing backend dependencies..."
+pip install -r requirements.txt
+
+# Running install_languages.py
+Write-Host "Installing translation languages..."
+python install_languages.py
+
+# Pulling Ollama models
+Write-Host "Pulling Ollama models..."
+ollama pull llama3.2
+ollama pull llama3.2:1b
+
+# Starting Redis server
+Write-Host "Starting Redis server..."
+Start-Process -NoNewWindow -FilePath "$RedisPath\redis-server.exe" -ArgumentList "--port 6381"
+
+# Starting FastAPI backend
+Write-Host "Starting FastAPI backend..."
+Start-Process -NoNewWindow -FilePath "powershell" -ArgumentList "uvicorn main:app --reload" -WorkingDirectory $BackendPath
+
+# Starting Watcher.py
+Write-Host "Starting Watcher.py..."
+Start-Process -NoNewWindow -FilePath "powershell" -ArgumentList "python Watcher.py" -WorkingDirectory $ProjectRoot
+
+Write-Host "Starting Vite React frontend using Docker..."
+docker compose up --build -d --no-deps frontend

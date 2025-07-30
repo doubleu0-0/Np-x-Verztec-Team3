@@ -1,18 +1,19 @@
-import { useState, useEffect, useRef } from "react"; // added useRef to detect clicks outside popup for closing it
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
-const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onChatSelect
+const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [typingTimeout, setTypingTimeout] = useState(null);
-  const [loading, setLoading] = useState(false); // 🔍 For spinner state while loading search results
-  const popupRef = useRef(null); // used to track popup container for detecting outside clicks
+  const [loading, setLoading] = useState(false);
+  const popupRef = useRef(null);
   const firstMatchRef = useRef(null);
 
-  // Simple highlight function for user query text (returns html string)
+  // Highlight function for user query text
   const highlightQuery = (text, keyword) => {
     if (!keyword.trim()) return text;
-    const words = keyword.trim().toLowerCase().split(/\s+/);
+    const words = keyword.trim().toLowerCase().split(/\s+/);6
     let highlighted = text;
 
     words.forEach((word) => {
@@ -33,7 +34,7 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     }
   }, [isOpen, query]);
 
-  // Added this useEffect to close popup when user clicks outside of it kinda expected UX nowadays i think?
+  // Added this useEffect to close popup when user clicks outside the popup
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (event) => {
@@ -43,19 +44,21 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
       }
     };
     
-    // Listen globally for clicks
     document.addEventListener("mousedown", handleClickOutside);
-    // Clean up the listener when popup closes or unmounts
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen, onClose]);
 
-  // Fetch recent chats API call (for when no search query, just show latest chats)
   const fetchRecentChats = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:8000/search?q=");
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`http://${remoteip}:8000/search?q=`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       setResults(res.data);
     } catch (err) {
       console.error("Failed to fetch recent chats:", err);
@@ -63,12 +66,16 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     setLoading(false);
   };
 
-  // Handle the actual search API call based on user's input query
   const handleSearch = async (searchTerm) => {
-    if (!searchTerm.trim()) return; // no empty searches pls
+    if (!searchTerm.trim()) return;
     setLoading(true);
     try {
-      const res = await axios.get(`http://localhost:8000/search?q=${searchTerm}`);
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`http://${remoteip}:8000/search?q=${searchTerm}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       setResults(res.data);
 
       // Auto-scroll to first result if search query is at least 3 characters
@@ -87,9 +94,9 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
       console.error("Search failed:", err);
     }
     setLoading(false);
-  };
+  };  
 
-  // Debounced input handler for search input box like for that automatic search-as-you-type experience
+  // Debounced input handler for automatic search-as-you-type experience
   const handleInputChange = (e) => {
     const value = e.target.value;
     setQuery(value);
@@ -104,19 +111,19 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
     setTypingTimeout(timeout);
   };
 
-  // Clear input handler — resets query and reloads recent chats
+  // Clear input handler which resets query and reloads recent chats
   const handleClearInput = () => {
     setQuery("");
     fetchRecentChats();
   };
 
-  const handleChatClick = (logId) => {
+  const handleChatClick = (conversationId) => {
     if (onChatSelect) {
-      onChatSelect(logId);  // ✅ notify App about clicked chat
+      onChatSelect(conversationId);
     } else {
       onClose();
     }
-  };
+  };  
 
   const smartPreview = (text, keyword, fallbackWordLimit = 20) => {
     if (!text) return "";
@@ -237,14 +244,24 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
 
   if (!isOpen) return null; // Only show popup if open
 
+  // Build a map of conversation_id to title (first non-empty title for each conversation)
+  const conversationTitles = {};
+  results.forEach(chat => {
+    if (chat.conversation_id && chat.title && chat.title.trim()) {
+      if (!conversationTitles[chat.conversation_id]) {
+        conversationTitles[chat.conversation_id] = chat.title;
+      }
+    }
+  });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      {/* Ref attached here so we can detect outside clicks for closing the popup */}
+      {/* Detect outside clicks for closing the popup */}
       <div
         ref={popupRef}
         className="bg-gray-100 dark:bg-gray-800 p-6 rounded-2xl w-full max-w-2xl h-[600px] shadow-xl flex flex-col"
       >
-        {/* Header with title and explicit close button (kept it cus its pretty standard for clarity and accessibility) */}
+        {/* Header with title and close button */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Search Chats</h2>
           <button
@@ -279,68 +296,38 @@ const SearchPopup = ({ isOpen, onClose, onChatSelect }) => {  // ✅ added onCha
           {query ? "Results" : "Chats in the last 30 days"}
         </div>
 
-        {/* The results list itself, scrollable with nice scrollbar styling */}
+        {/* Scrollable results list */}
         <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
           {results.map((chat, index) => {
-            if (!chat.query.trim()) return null;
+            if (!chat.preview || !chat.preview.trim()) return null;
 
-            const searchWordCount = query.trim().split(/\s+/).length;
+            const highlightedPreview = highlightQuery(chat.preview, query);
+            // Use the first available title for this conversation_id
+            const displayTitle = conversationTitles[chat.conversation_id] || "Untitled Chat";
 
-            if (searchWordCount > 4) {
-              // Show only the user question with highlighted search terms
-              const highlightedQuery = highlightQuery(chat.query, query);
-              if (!highlightedQuery.trim()) return null;
-
-              return (
-                <div
-                  key={chat.log_id}
-                  ref={index === 0 ? firstMatchRef : null}
-                  className="group cursor-pointer transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 p-3 rounded-lg text-gray-900 dark:text-white"
-                  onClick={() => handleChatClick(chat.log_id)}
-                >
-                  <p
-                    className="text-sm line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: highlightedQuery }}
-                  ></p>
-                  <small className="text-xs text-gray-600 dark:text-gray-300 block mt-1 opacity-0 group-hover:opacity-100 transition">
-                    {formatChatTime(chat.created_at)}
-                  </small>
-                </div>
-              );
-            } else {
-              // fallback to existing behaviour - show bot response with smartPreview
-              const html = smartPreview(chat.response, query);
-              if (!html.trim()) return null;
-
-              return (
-                <div
-                  key={chat.log_id}
-                  ref={index === 0 ? firstMatchRef : null}
-                  className="group cursor-pointer transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 p-3 rounded-lg text-gray-900 dark:text-white"
-                  onClick={() => handleChatClick(chat.log_id)}
-                >
-                  <p
-                    className="text-sm line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: html }}
-                  ></p>
-                  <small className="text-xs text-gray-600 dark:text-gray-300 block mt-1 opacity-0 group-hover:opacity-100 transition">
-                    {formatChatTime(chat.created_at)}
-                  </small>
-                </div>
-              );
-            }
-          })}
-          {/* Show no matches message if no results with previews */}
-          {!loading && results.filter(chat => {
-            const count = query.trim().split(/\s+/).length;
-            if (count >= 4) {
-              return chat.query.trim();
-            } else {
-              return smartPreview(chat.response, query).trim();
-            }
-          }).length === 0 && (
+            return (
+              <div
+                key={chat.conversation_id}
+                ref={index === 0 ? firstMatchRef : null}
+                className="group cursor-pointer transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 p-3 rounded-lg text-gray-900 dark:text-white"
+                onClick={() => handleChatClick(chat.conversation_id)}
+              >
+                <h3 className="text-base font-normal mb-1 line-clamp-1">
+                  {displayTitle}
+                </h3>              
+                <p
+                  className="text-sm line-clamp-2"
+                  dangerouslySetInnerHTML={{ __html: highlightedPreview }}
+                ></p>
+                <small className="text-xs text-gray-600 dark:text-gray-300 block mt-1 opacity-0 group-hover:opacity-100 transition">
+                  {formatChatTime(chat.created_at)}
+                </small>
+              </div>
+            );
+          })}          
+          {!loading && results.filter(chat => chat.preview && chat.preview.trim()).length === 0 && (
             <p className="text-sm text-gray-400 dark:text-gray-500">No matches found.</p>
-          )}
+          )}          
         </div>
       </div>
     </div>

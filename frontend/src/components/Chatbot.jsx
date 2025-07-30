@@ -5,46 +5,51 @@ import ChatInput from '@/components/ChatInput';
 import logo from '@/assets/images/logo.svg';
 import white_logo from '@/assets/images/logo-white.png';
 import ModelSelector from '@/components/ModelSelector';
+import { useTTS } from '@/contexts/TTSContext';
+const remoteip = import.meta.env.VITE_REMOTE_IP
 
-
-function Chatbot({ userProfile, selectedLogId = null }) {
-  const [messages, setMessages] = useImmer([]); // Stores chat messages
-  const [newMessage, setNewMessage] = useState(''); // Stores the current input message
-  const [status, setStatus] = useState(''); // Which phase the bot is in (Searching database, preprocessing, etc)
-  const [selectedModel, setSelectedModel] = useState('llama3.2:latest');
+function Chatbot({
+  userProfile,
+  selectedModel,
+  setSelectedModel,
+  selectedLogId = null,
+  onNewChatCreated,
+  messages: initialMessages = [],
+  conversationId,
+  setConversationId  
+}) {
+  const [messages, setMessages] = useImmer([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [processingState, setProcessingState] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [loadingLog, setLoadingLog] = useState(false); 
-  const messagesEndRef = useRef(null); // Just for auto scrolling
+  const [loadingLog, setLoadingLog] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false); 
+  const abortControllerRef = useRef(null); 
+  const messagesEndRef = useRef(null);
 
   const isLoading = messages.length && messages[messages.length - 1].loading;
+  const { speakText } = useTTS();
+  const [shouldSpeak, setShouldSpeak] = useState(false);
 
-    // Chat log loading logic
   useEffect(() => {
-    if (!selectedLogId) return;
+    if (initialMessages) {
+      setMessages(initialMessages);
+      setShouldSpeak(false); // Don't speak when loading history
+      // Stop any ongoing TTS when loading chat history
+      window.speechSynthesis.cancel();
+    }
+  }, [initialMessages, setMessages]);
 
-    const fetchLog = async () => {
-      setLoadingLog(true);
-      setStatus('🔄 Loading previous chat...');
-      try {
-        const res = await fetch(`http://localhost:8000/chat-log/${selectedLogId}`);
-        if (!res.ok) throw new Error(`Failed to load chat log: ${res.status}`);
-        const data = await res.json();
-        if (!data.messages) throw new Error('Invalid data format');
+  useEffect(() => {
+    // Stop any ongoing TTS when switching to a new chat or clearing messages
+    window.speechSynthesis.cancel();
 
-        setMessages(data.messages);
-        setStatus('✅ Chat loaded.');
-      } catch (err) {
-        console.error(err);
-        setStatus(`✗ Could not load chat: ${err.message}`);
-      } finally {
-        setLoadingLog(false);
-      }
-    };
+    if (selectedLogId === null) {
+      setMessages([]);
+      setProcessingState(null); // Clear processing state
+    }
+  }, [selectedLogId]);
 
-    fetchLog();
-  }, [selectedLogId, setMessages]);
-
-  // Auto scrolling
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -57,27 +62,44 @@ function Chatbot({ userProfile, selectedLogId = null }) {
     return () => observer.disconnect();
   }, []);
 
-
   async function submitNewMessage() {
     const trimmedMessage = newMessage.trim();
     if (!trimmedMessage || isLoading) return;
 
+    let finalConversationId = conversationId;
+    if (!finalConversationId) {
+      finalConversationId = crypto.randomUUID();
+      setConversationId(finalConversationId);
+      if (onNewChatCreated) {
+        onNewChatCreated(finalConversationId);
+      }
+    }
+
     setMessages(draft => {
       draft.push({ role: 'user', content: trimmedMessage });
     });
+    setShouldSpeak(false);
 
     setNewMessage('');
-    setStatus("Processing your message...");
+    setProcessingState('processing'); // Show processing animation
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:8000/process', {
+      
+      // Add a small delay to show the processing animation
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const res = await fetch(`http://${remoteip}:8000/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: trimmedMessage, model: selectedModel }),
+        body: JSON.stringify({
+          message: trimmedMessage,
+          model: selectedModel,
+          conversation_id: finalConversationId
+        }),
       });
 
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -85,7 +107,11 @@ function Chatbot({ userProfile, selectedLogId = null }) {
       let parsedQuestions = [];
 
       if (contentType && contentType.includes("application/json")) {
-        // Read the stream as text, then parse JSON
+        setProcessingState('extracting'); // Show extracting animation
+        
+        // Add delay to show extracting animation
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         let text = "";
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -99,20 +125,46 @@ function Chatbot({ userProfile, selectedLogId = null }) {
         try {
           data = JSON.parse(text);
         } catch (e) {
-          setStatus("✗ Error: Invalid JSON from server.");
+          setProcessingState(null);
           return;
         }
         parsedQuestions = data.questions || [];
-        // Only call /stream if there are questions
+        const originalMessage = data.original_message;
+
         if (parsedQuestions.length === 0) {
-          setStatus("No HR-related questions found.");
+          setProcessingState(null);
           setMessages(draft => {
             draft.push({ role: 'assistant', content: "I'm here to help with HR-related concerns like leave, policies, or claims!" });
           });
           return;
         }
+
+        setProcessingState('searching'); // Show searching animation
+        
+        // Add delay to show searching animation
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        
+        const assistantIndexes = [];
+        setMessages(draft => {
+          parsedQuestions.forEach(() => {
+            const index = draft.length;
+            draft.push({ role: 'assistant', content: '', loading: true });
+            assistantIndexes.push(index);
+          });
+        });
+
+        setProcessingState(null); // Clear processing state when messages start loading
+        parsedQuestions.forEach((q, i) => {
+          setTimeout(() => {
+            streamAnswer(q, assistantIndexes[i], originalMessage);
+          }, 0);
+        });
       } else {
-        // Fallback streaming response (not questions)
+        setProcessingState('generating'); // Show generating animation
+        
+        // Add delay to show generating animation
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
         let text = "";
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -123,6 +175,14 @@ function Chatbot({ userProfile, selectedLogId = null }) {
           assistantIndex = draft.length;
           draft.push({ role: 'assistant', content: '', loading: true });
         });
+        setShouldSpeak(false); // Don't speak until complete
+
+        setIsStreaming(true);
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
+        let hasSpoken = false;
+        setProcessingState(null); // Clear processing state when streaming starts
 
         while (!done) {
           const { value, done: doneReading } = await reader.read();
@@ -133,66 +193,71 @@ function Chatbot({ userProfile, selectedLogId = null }) {
             setMessages(draft => {
               if (draft[assistantIndex]) draft[assistantIndex].content += chunk;
             });
+            if (!hasSpoken && chunk.trim().length > 0) {
+              setShouldSpeak(true); // Start TTS as soon as content arrives
+              hasSpoken = true;
+            }
           }
         }
 
         setMessages(draft => {
-          if (draft[assistantIndex]) draft[assistantIndex].loading = false;
+          if (draft[assistantIndex]) {
+            draft[assistantIndex].loading = false;
+          }
         });
-        setStatus("");
-        return; // Do NOT call /stream
+        setShouldSpeak(true); // Speak only after response is complete
+        setIsStreaming(false);
+        return;
       }
 
-      setStatus(`Extracted ${parsedQuestions.length} question(s).`);
-      const assistantIndexes = [];
-      setMessages(draft => {
-        parsedQuestions.forEach(() => {
-          const index = draft.length;
-          draft.push({ role: 'assistant', content: '', loading: true });
-          assistantIndexes.push(index);
-        });
-      });
-
-      parsedQuestions.forEach((q, i) => {
-        setTimeout(() => {
-          streamAnswer(q, assistantIndexes[i]);
-        }, 0);
-      });
-
     } catch (err) {
-      setStatus(`✗ Error: ${err.message}`);
+      setProcessingState(null);
+      setIsStreaming(false);
     }
   }
 
-  async function streamAnswer(questionText, assistantIndex) {
+  async function streamAnswer(questionText, assistantIndex, originalMessage) {
+    setIsStreaming(true);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:8000/stream', {
+      const res = await fetch(`http://${remoteip}:8000/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: questionText, model: selectedModel }),
-      });
+        body: JSON.stringify({
+          message: questionText,
+          model: selectedModel,
+          conversation_id: conversationId,
+          original_message: originalMessage
+        }),
+        signal: controller.signal
+     });
 
       if (!res.ok) throw new Error(`Stream error: ${res.status}`);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let done = false;
-      let gotAny = false;
 
+      let hasSpoken = false;
       while (!done) {
         const { value, done: doneReading } = await reader.read();
         done = doneReading;
         if (value) {
-          gotAny = true;
           const chunk = decoder.decode(value);
           setMessages(draft => {
             if (!draft[assistantIndex]) return;
             draft[assistantIndex].content += chunk;
           });
+          if (!hasSpoken && chunk.trim().length > 0) {
+            setShouldSpeak(true); // Start TTS as soon as content arrives
+            hasSpoken = true;
+          }
         }
       }
 
@@ -200,15 +265,15 @@ function Chatbot({ userProfile, selectedLogId = null }) {
         if (!draft[assistantIndex]) return;
         draft[assistantIndex].loading = false;
       });
-      
-      setStatus("Done :)");
+      setShouldSpeak(true); // Speak only after response is complete
+
     } catch (err) {
-      setStatus(`✗ Stream error: ${err.message}`);
       setMessages(draft => {
         if (!draft[assistantIndex]) return;
         draft[assistantIndex].loading = false;
-        draft[assistantIndex].content = "Error streaming response.";
       });
+    } finally {
+      setIsStreaming(false); 
     }
   }
 
@@ -222,38 +287,73 @@ function Chatbot({ userProfile, selectedLogId = null }) {
           <div><b>Department:</b> {userProfile.department}</div>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto px-4 pt-6 min-h-0">
-        {messages.length === 0 ? (
+
+      <div className='flex-1 overflow-y-auto min-h-0 space-y-4 p-4'>
+        {messages.length === 0 && !processingState ? (
           <>
-            {/* Centered Verztec logo and title */}
             <div className="flex flex-col items-center mb-6">
-              <img src={isDarkMode ? white_logo : logo} className="w-32 mb-2" alt="logo" /> 
+              <img src={isDarkMode ? white_logo : logo} className="w-32 mb-2" alt="logo" />
               <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
-              Verztec's AI Assistant
-            </h1>
+                Verztec's AI Assistant
+              </h1>
             </div>
             <div className="font-urbanist text-primary-blue text-xl font-light space-y-2 text-center">
               <p>👋 Hi there!</p>
               <p>
-                I’m your AI assistant here at Verztec, think of me as your go-to guide for all things work and HR. From office policies to pantry rules, I’m here 24/7 to help you navigate your workday with ease.
+                I'm your AI assistant here at Verztec, think of me as your go-to guide for all things work and HR. From office policies to pantry rules, I'm here 24/7 to help you navigate your workday with ease.
               </p>
-              <p>Whenever you’re ready, I’m here to help.</p>
+              <p>Whenever you're ready, I'm here to help.</p>
             </div>
           </>
         ) : (
-          <ChatMessages messages={messages} isLoading={isLoading} />
+          <ChatMessages 
+            messages={messages} 
+            isLoading={isLoading} 
+            processingState={processingState}
+            shouldSpeak={shouldSpeak}
+          />
         )}
         <div ref={messagesEndRef} />
       </div>
 
       <ChatInput
         newMessage={newMessage}
-        isLoading={isLoading}
+        isLoading={isLoading || processingState !== null}
         setNewMessage={setNewMessage}
         submitNewMessage={submitNewMessage}
+        isStreaming={isStreaming}                 
+        onStop={async () => {
+          if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+          }
+          // Log the partial response to backend
+          // Find the last user message and last assistant message
+          const lastUserMsg = messages.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+          const lastAssistantMsgIdx = messages.map((m, i) => m.role === 'assistant' ? i : -1).filter(i => i !== -1).slice(-1)[0];
+          const lastAssistantMsg = lastAssistantMsgIdx !== undefined && lastAssistantMsgIdx !== -1 ? messages[lastAssistantMsgIdx].content : '';
+          // Only log if there is a partial response
+          if (lastUserMsg && lastAssistantMsg) {
+            try {
+              const token = localStorage.getItem('token');
+              await fetch(`http://${remoteip}:8000/log_conversation/`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  query: lastUserMsg,
+                  response: lastAssistantMsg,
+                  conversation_id: conversationId
+                })
+              });
+            } catch (err) {
+              // Optionally show error to user
+            }
+          }
+        }}
+        isDarkMode={isDarkMode}
       />
-
-      <div className="text-sm text-gray-500 px-4 py-2">{status}</div>
     </div>
   );
 }
