@@ -6,7 +6,6 @@ $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 # Defining subpaths
 $BackendPath = Join-Path $ProjectRoot "backend"
 $FrontendPath = Join-Path $ProjectRoot "frontend"
-$RedisPath = "C:\Program Files\Redis"
 
 # Activating Python venv
 Write-Host "Activating Python virtual environment..."
@@ -26,16 +25,23 @@ Write-Host "Pulling Ollama models..."
 ollama pull llama3.2
 ollama pull llama3.2:1b
 
+Write-Host "Starting Ollama server..."
+$env:OLLAMA_HOST = "0.0.0.0"
+Start-Process -NoNewWindow -FilePath "ollama" -ArgumentList "serve"
+
 # Starting Redis server
 Write-Host "Starting Redis server..."
-Start-Process -NoNewWindow -FilePath "$RedisPath\redis-server.exe" -ArgumentList "--port 6381"
+Start-Process -NoNewWindow `
+  -FilePath "C:\Program Files\Redis\redis-server.exe" `
+  -ArgumentList '"C:\Program Files\Redis\redis.windows.conf"'
 
 # Starting FastAPI backend
 Write-Host "Starting FastAPI backend..."
-Start-Process -NoNewWindow -FilePath "powershell" -ArgumentList "uvicorn main:app --reload" -WorkingDirectory $BackendPath
+Start-Process -NoNewWindow -FilePath "powershell" -ArgumentList "uvicorn main:app --host 0.0.0.0 --port 8000" -WorkingDirectory $BackendPath
 
 # Starting Watcher.py
 Write-Host "Starting Watcher.py..."
+pip install watchdog
 Start-Process -NoNewWindow -FilePath "powershell" -ArgumentList "python Watcher.py" -WorkingDirectory $ProjectRoot
 
 # Setting up and starting the frontend

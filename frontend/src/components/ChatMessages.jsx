@@ -11,7 +11,7 @@ const remoteip = import.meta.env.VITE_REMOTE_IP
 function ChatMessages({ messages, isLoading, processingState = null, shouldSpeak }) {
   const bottomRef = useRef(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const { speakText } = useTTS(); // Get the speakText function from context
+  const { speakText, setIsProcessing } = useTTS();
 
   // List of fun facts
   const funFacts = [
@@ -37,6 +37,11 @@ function ChatMessages({ messages, isLoading, processingState = null, shouldSpeak
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [funFactTimer, setFunFactTimer] = useState(null);
   const [rotateTimer, setRotateTimer] = useState(null);
+
+  useEffect(() => {
+    const isAnyProcessing = messages.some(m => m.loading) || !!processingState;
+    setIsProcessing(isAnyProcessing);
+  }, [messages, processingState, setIsProcessing]);
 
   // --- Fun Fact Effect (runs as long as loading or processingState is active and not in citation phase) ---
   useEffect(() => {

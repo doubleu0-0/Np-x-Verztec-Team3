@@ -73,7 +73,12 @@ cd Np-x-Verztec-Team3
 ### 3. Environment Variables
 - Copy .env.example and rename it to .env. Fill in the required values.
 
-### 4. Set Up Python Virtual Environment
+### 4. Docker Setup
+```powershell
+docker-compose up --build
+```
+
+### 5. Set Up Python Virtual Environment
 - Run the following commands in a PowerShell terminal
 ```powershell
 cd backend
@@ -88,8 +93,17 @@ Get-Command python
 & "C:\Program Files\Python38\python.exe" -m venv venv
 ```
 
-### 5. Start the Entire Stack
-- Open a new Powershell terminal and run the following command
+### 6. Start the Entire Stack
+- Create start-all.ps1 in the root directory using start-all.ps1.example
+- Open a new Powershell terminal and run the following command (Outside venv) (Only localhost)
 ```powershell
 .\start-all.ps1
+```
+
+OR
+
+- Create start-all-everywhere.ps1 in the root directory using start-all-everywhere.ps1.example
+- Open a new Powershell terminal and run the following command (Outside venv) (Usable from everywhere)
+```powershell
+.\start-all-everywhere.ps1
 ```
