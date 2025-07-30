@@ -1,27 +1,10 @@
 {
   "departments": [
-    "Human Resource",
-    "Admin & Operations",
-    "Project Management",
-    "Procurement",
-    "IT",
-    "Marketing",
-    "Business Development",
-    "Finance",
-    "Service Delivery"
+    "Project Management"
   ],
   "countries": [
-    "Singapore",
-    "United Kingdom",
-    "United States",
-    "Thailand",
-    "Indonesia",
-    "Korea",
-    "China",
-    "Japan",
-    "Vietnam",
-    "Myanmar"
+    "Thailand"
   ],
   "uploaded_by": "e",
-  "upload_time": "2025-07-20T21:50:21.363424"
+  "upload_time": "2025-07-30T14:09:58.384303"
 }

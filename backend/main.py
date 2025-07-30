@@ -319,8 +319,7 @@ async def process_message(
     if not questions:
         print("[INFO] No HR-related questions found. Generating fallback...")
         fallback_prompt = f"""You are Verztec's AI HR assistant. The user did not ask any HR-related questions or concerns.
-        If the message isn't about corporate things (ISO/QMS files and company standars)
-        or HR (like leave, claims, benefits, or work policies), reply in a super casual, friendly manner. 
+        If the message isn't about HR (like leave, claims, benefits, or work policies), reply in a super casual, friendly manner. 
         No formal greetings, no sign-offs, no long explanations. Just a short, warm, human reply.
         If the user says something sweet or emotional (like "thank you" or "you're the best"), feel free to respond in kind—e.g., "Aww, thanks!", "You're awesome!", or use emojis.
         If you're not sure what they meant, gently ask if they have any HR-related questions, but keep it light and informal.
@@ -340,6 +339,7 @@ async def process_message(
 
         Now, reply to the user:
         """
+
         print(f"[Process] Querying with: {user_prompt}")
         query_engine = index.as_query_engine(streaming=True, llm=llm_model)
         chat_engine = index.as_chat_engine(
@@ -483,8 +483,20 @@ async def stream_answer(
             ]
         )
         retriever = VectorIndexRetriever(index=index, similarity_top_k=5, filters=filters)
-        print(f"[DEBUG] Using FILTERED retriever for {role}: {country_key}={department_key}")
+        print(f"[DEBUG] Using FILTERED retriever for {role}: {country_key}=True AND {department_key}=True")    
 
+    test_nodes = retriever.retrieve("office plant care policy")
+    print(f"[DEBUG] Plant care filter test returned {len(test_nodes)} nodes:")
+    for i, node in enumerate(test_nodes):
+        metadata = node.node.metadata
+        country_val = metadata.get(country_key, "Unknown")
+        dept_val = metadata.get(department_key, "Unknown")
+        title = metadata.get('title', 'Unknown')
+        print(f"  Node {i+1}: {title}")
+        print(f"    {country_key}: {country_val}")
+        print(f"    {department_key}: {dept_val}")
+        print(f"    Should be filtered: {country_val != 'True' or dept_val != 'True'}")
+    
     # Create response synthesizer and query engine with the correct retriever
     response_synthesizer = get_response_synthesizer(response_mode="tree_summarize", llm=llm_model, streaming=True)
     custom_query_engine = RetrieverQueryEngine(retriever=retriever, response_synthesizer=response_synthesizer)
@@ -499,9 +511,8 @@ async def stream_answer(
     You are able to provide information about HR policies, leave, benefits, claims, WFH, or company policies.
     Answer all questions in a friendly and human-like manner. If you are not confident about the answer,
     you should tell the user that you are not sure and suggest they contact HR directly.
-    You should reply in the same language as the user's prompt.
     """
-    
+
     print(f"[STREAM] Querying with: {data.message}")
     
     # Create chat engine with the filtered query engine
@@ -516,6 +527,7 @@ async def stream_answer(
 
     # Helper to check for boilerplate/empty responses
     def is_response_empty(resp):
+        print("[DEBUG]: running is_empty")
         BOILERPLATE = [
             "no response",
             "no relevant information found", 
@@ -526,7 +538,8 @@ async def stream_answer(
             "unfortunately",
             "i am sorry",
             "i do not",
-            r"I' couldn't",
+            r"i 'm not aware",
+            r"I couldn't",
         ]
         if resp is None:
             print("[DEBUG] Response is None")
@@ -547,11 +560,11 @@ async def stream_answer(
             print("[DEBUG] Found response_gen attribute, attempting to peek...")
             try:
                 gen = resp.response_gen
-                # Peek at the first 10 tokens WITHOUT consuming them permanently
+                # Peek at the first 5 tokens WITHOUT consuming them permanently
                 peeked = []
                 for i, token in enumerate(gen):
                     peeked.append(token)
-                    if i >= 9:  # Peek at first 10 tokens (0-9)
+                    if i >= 4:  # Peek at first 5 tokens (0-4)
                         break
                         
                 print(f"[DEBUG] Peeked {len(peeked)} streaming chunks:")
@@ -627,29 +640,6 @@ async def stream_answer(
         finally:
             conn.close()
 
-            # --- Send fallback email ---
-        try:
-            sender = EMAIL_SENDER_USER
-            recipient = GMAIL_USER
-            subject = "[AI HR Fallback] User Query Needs Attention"
-            user_email = current_user.get("email", "unknown")
-            department = current_user.get("department", "unknown")
-            msg_body = (
-                f"User info: role={role}, country={country}, department={department}, email={user_email}\n\n"
-                f"User query:\n{original_user_message}\n\n"
-                f"Chatbot response:\n{raw_text}\n"
-            )
-            send_email(
-                to_email=recipient,
-                subject=subject,
-                body=msg_body,
-                is_html=False,  # plain text for clarity
-                sender=sender
-            )
-
-        except Exception as e:
-            print(f"[Fallback Email] Failed to send fallback email: {e}")
-
         def fallback_stream():
             yield response_with_metadata
         return StreamingResponse(fallback_stream(), media_type="text/plain")
@@ -675,22 +665,20 @@ async def stream_answer(
             snippet = node.text[:500]  # Shorter snippet
             docs_summary.append(f"{i+1}. {doc_name}: {snippet}")
         
-            prompt = f"""
-                Given the user query and AI response, select the most relevant document based on content and authority.
+        prompt = f"""
+            Given this user query and AI response, which documents are most relevant?
 
-                Query: {query}
-                Response: {response_text[:1000]}...
+            Query: {query}
+            Response: {response_text[:1000]}...
 
-                Available documents:
-                {chr(10).join(docs_summary)}
+            Available documents:
+            {chr(10).join(docs_summary)}
 
-                Instructions:
-                - If the user query **does not** mention the term "ISO", you may assume documents with "ISO" in the title are relevant.
-                - However, **if the user query includes the term "ISO"**, do **not** automatically assume a document is relevant just because its title includes "ISO". Instead, evaluate the actual content and choose the most authoritative or governing document (e.g., quality manuals, standards, or policies).
-                - Prefer foundational or policy-setting documents over audits, logs, or records of implementation.
-                - Select only the single best document number. If none are relevant, respond with "none".
-                - Only respond with the number(s), comma-separated. No explanation needed.
-                            """
+            Select the most relevant document numbers (e.g., "1,3,5"). 
+            If you think none are relevant, respond with "none".
+            Best number is 1 citation only.
+            Only respond with the numbers, comma-separated.
+            """
 
         try:
             llm_response = llm_model.complete(prompt)
@@ -2295,6 +2283,8 @@ def update_docs_with_metadata(filename, file_metadata):
             original_doc = all_docs["documents"][i]
             original_metadata = all_docs["metadatas"][i]
             updated_metadata = original_metadata.copy()
+
+            # Update top-level metadata
             for dept in ALL_DEPARTMENTS:
                 updated_metadata[dept] = "True" if dept in departments else "False"
             for country in ALL_COUNTRIES:
@@ -2303,6 +2293,36 @@ def update_docs_with_metadata(filename, file_metadata):
                 updated_metadata["uploaded_by"] = file_metadata.get("uploaded_by", "")
             if "upload_time" not in updated_metadata:
                 updated_metadata["upload_time"] = file_metadata.get("upload_time", datetime.now().isoformat())
+            
+            # 🔥 FIX: Update ALL THREE metadata locations
+            if "_node_content" in original_metadata:
+                try:
+                    import json
+                    node_content = json.loads(original_metadata["_node_content"])
+                    
+                    # 1. Update the main embedded metadata
+                    for dept in ALL_DEPARTMENTS:
+                        node_content["metadata"][dept] = "True" if dept in departments else "False"
+                    for country in ALL_COUNTRIES:
+                        node_content["metadata"][country] = "True" if country in countries else "False"
+                    
+                    # 2. 🚨 UPDATE THE RELATIONSHIPS METADATA TOO! 🚨
+                    if "relationships" in node_content and "1" in node_content["relationships"]:
+                        rel_metadata = node_content["relationships"]["1"].get("metadata", {})
+                        for dept in ALL_DEPARTMENTS:
+                            rel_metadata[dept] = "True" if dept in departments else "False"
+                        for country in ALL_COUNTRIES:
+                            rel_metadata[country] = "True" if country in countries else "False"
+                        node_content["relationships"]["1"]["metadata"] = rel_metadata
+                    
+                    # Update the _node_content with ALL fixed metadata
+                    updated_metadata["_node_content"] = json.dumps(node_content)
+                    print(f"✅ Fixed ALL metadata locations for {doc_id}")
+                    
+                except Exception as e:
+                    print(f"⚠️ Error updating embedded metadata for {doc_id}: {e}")
+            
+            # 🔥 REMOVE THE DUPLICATE chroma_collection.update() calls
             chroma_collection.update(
                 ids=[doc_id],
                 documents=[original_doc],
