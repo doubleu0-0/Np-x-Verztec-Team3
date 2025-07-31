@@ -474,7 +474,6 @@ async def stream_answer(
     # Create the appropriate retriever based on user role
     if role == "ADMIN":
         retriever = VectorIndexRetriever(index=index, similarity_top_k=5)
-        print("[DEBUG] Using UNFILTERED retriever for ADMIN")
     else:
         filters = MetadataFilters(
             filters=[
@@ -483,19 +482,6 @@ async def stream_answer(
             ]
         )
         retriever = VectorIndexRetriever(index=index, similarity_top_k=5, filters=filters)
-        print(f"[DEBUG] Using FILTERED retriever for {role}: {country_key}=True AND {department_key}=True")    
-
-    test_nodes = retriever.retrieve("office plant care policy")
-    print(f"[DEBUG] Plant care filter test returned {len(test_nodes)} nodes:")
-    for i, node in enumerate(test_nodes):
-        metadata = node.node.metadata
-        country_val = metadata.get(country_key, "Unknown")
-        dept_val = metadata.get(department_key, "Unknown")
-        title = metadata.get('title', 'Unknown')
-        print(f"  Node {i+1}: {title}")
-        print(f"    {country_key}: {country_val}")
-        print(f"    {department_key}: {dept_val}")
-        print(f"    Should be filtered: {country_val != 'True' or dept_val != 'True'}")
     
     # Create response synthesizer and query engine with the correct retriever
     response_synthesizer = get_response_synthesizer(response_mode="tree_summarize", llm=llm_model, streaming=True)
