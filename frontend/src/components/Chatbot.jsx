@@ -285,7 +285,7 @@ function Chatbot({
             <div className="flex flex-col items-center mb-6">
               <img src={isDarkMode ? white_logo : logo} className="w-32 mb-2" alt="logo" />
               <h1 className="text-2xl font-semibold text-gray-900 dark:text-white transition-all duration-300">
-                Verztec's AI Assistant
+                Lunar AI Assistant
               </h1>
             </div>
             <div className="font-urbanist text-primary-blue text-xl font-light space-y-2 text-center">

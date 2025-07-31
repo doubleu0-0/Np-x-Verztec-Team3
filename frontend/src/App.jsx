@@ -530,7 +530,7 @@ function AppContent({ selectedAvatar, setSelectedAvatar }) {
             <div className="flex justify-between items-center">
               <img src={isDarkMode ? white_logo : logo} className="w-32" alt="logo" />
               <h1 className="text-xl xl:text-2xl font-semibold text-gray-900 dark:text-white">
-                Verztec's AI Assistant
+                Lunar AI Assistant
               </h1>
             </div>
           </div>

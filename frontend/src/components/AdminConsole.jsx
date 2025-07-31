@@ -353,7 +353,7 @@ export default function AdminConsole({ userProfile, onBack, isDarkMode, toggleTh
             {/* Right side - Verztec's AI Assistant */}
             <div className="flex-1 flex justify-end pr-4 lg:pr-8">
               <h1 className="text-lg lg:text-2xl font-semibold text-gray-900 dark:text-white truncate">
-                Verztec's AI Assistant
+                Lunar AI Assistant
               </h1>
             </div>
           </div>

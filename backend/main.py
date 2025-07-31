@@ -1635,11 +1635,11 @@ async def batch_upload_files(
                     conn.close()
                 
                 uploaded_files.append(file.filename)
-                print(f"✅ File {file.filename} uploaded and logged to both tables")
+                print(f"File {file.filename} uploaded and logged to both tables")
                 
             except Exception as e:
                 failed_files.append({"filename": file.filename, "error": str(e)})
-                print(f"❌ Failed to upload {file.filename}: {e}")
+                print(f"Failed to upload {file.filename}: {e}")
                 
                 # Clean up file if something goes wrong
                 if 'file_path' in locals() and file_path.exists():
@@ -2294,19 +2294,19 @@ def update_docs_with_metadata(filename, file_metadata):
             if "upload_time" not in updated_metadata:
                 updated_metadata["upload_time"] = file_metadata.get("upload_time", datetime.now().isoformat())
             
-            # 🔥 FIX: Update ALL THREE metadata locations
+            # Update all metadata locations
             if "_node_content" in original_metadata:
                 try:
                     import json
                     node_content = json.loads(original_metadata["_node_content"])
                     
-                    # 1. Update the main embedded metadata
+                    # Update the main embedded metadata
                     for dept in ALL_DEPARTMENTS:
                         node_content["metadata"][dept] = "True" if dept in departments else "False"
                     for country in ALL_COUNTRIES:
                         node_content["metadata"][country] = "True" if country in countries else "False"
                     
-                    # 2. 🚨 UPDATE THE RELATIONSHIPS METADATA TOO! 🚨
+                    # Update relationships metadata
                     if "relationships" in node_content and "1" in node_content["relationships"]:
                         rel_metadata = node_content["relationships"]["1"].get("metadata", {})
                         for dept in ALL_DEPARTMENTS:
@@ -2315,14 +2315,13 @@ def update_docs_with_metadata(filename, file_metadata):
                             rel_metadata[country] = "True" if country in countries else "False"
                         node_content["relationships"]["1"]["metadata"] = rel_metadata
                     
-                    # Update the _node_content with ALL fixed metadata
+                    # Update the _node_content with all fixed metadata
                     updated_metadata["_node_content"] = json.dumps(node_content)
-                    print(f"✅ Fixed ALL metadata locations for {doc_id}")
-                    
+                    print(f"Fixed all metadata locations for {doc_id}")
+
                 except Exception as e:
-                    print(f"⚠️ Error updating embedded metadata for {doc_id}: {e}")
-            
-            # 🔥 REMOVE THE DUPLICATE chroma_collection.update() calls
+                    print(f"Error updating embedded metadata for {doc_id}: {e}")
+
             chroma_collection.update(
                 ids=[doc_id],
                 documents=[original_doc],

@@ -22,7 +22,6 @@ function ChatMessages({ messages, isLoading, processingState = null, shouldSpeak
     "In Portuguese we don't say \"i love you\" instead we say \"eu te amo\" which means the exact same thing only in portuguese",
     "Interesting: In Verztec, height depends on how tall you are",
     "Did you know? Verztec employees with beards are just employees without beards, with beards",
-    "Fun fact: Bald people are less likely to have hair",
     "Interesting: In Verztec, the boiling point of water is 100 degrees Celsius",
     "In Verztec, height depends on how tall you are",
     "Fun fact: The average annual salary in Verztec is 5 million dollars!",
